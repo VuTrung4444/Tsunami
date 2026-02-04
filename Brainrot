@@ -94,13 +94,12 @@ Ect:AddToggle({
 		end)
 	end)
 
-
 local ESPEnabled = false
 local ESPLabels = {}
 local ESPConnection
 
 -- Hàm tạo ESP label
-local function createESPLabel(instance)
+local function createESPLabel(instance, displayName)
     local billboardGui = Instance.new("BillboardGui")
     billboardGui.Name = "ESP_" .. instance.Name
     billboardGui.AlwaysOnTop = true
@@ -112,7 +111,7 @@ local function createESPLabel(instance)
     textLabel.Name = "Label"
     textLabel.Size = UDim2.new(1, 0, 1, 0)
     textLabel.BackgroundTransparency = 1
-    textLabel.Text = instance.Name
+    textLabel.Text = displayName or instance.Name
     textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
     textLabel.TextStrokeTransparency = 0
     textLabel.TextScaled = true
@@ -152,9 +151,22 @@ local function updateESP()
             local folder = activeBrainrots:FindFirstChild(folderName)
             if folder then
                 -- Hiển thị ESP cho tất cả đối tượng con trong folder này
-                for _, child in pairs(folder:GetChildren()) do
-                    local espLabel = createESPLabel(child)
-                    table.insert(ESPLabels, espLabel)
+                for _, brainrot in pairs(folder:GetChildren()) do
+                    -- Tìm RenderedBrainrot bên trong
+                    local renderedBrainrot = brainrot:FindFirstChild("RenderedBrainrot")
+                    if renderedBrainrot then
+                        -- Lấy tệp con đầu tiên của RenderedBrainrot
+                        local childObject = renderedBrainrot:GetChildren()[1]
+                        if childObject then
+                            -- Tạo ESP gắn vào brainrot nhưng hiển thị tên của childObject
+                            local espLabel = createESPLabel(brainrot, childObject.Name)
+                            table.insert(ESPLabels, espLabel)
+                        end
+                    else
+                        -- Nếu không có RenderedBrainrot, hiển thị tên bình thường
+                        local espLabel = createESPLabel(brainrot)
+                        table.insert(ESPLabels, espLabel)
+                    end
                 end
             end
         end
@@ -178,7 +190,7 @@ Ect:AddToggle({
         ESPEnabled = value
         
         if ESPEnabled then
-            -- Bật ESP
+
             updateESP()
             
 
@@ -190,6 +202,7 @@ Ect:AddToggle({
                     end
                 end
             end)
+            
 
         else
 
@@ -204,6 +217,7 @@ Ect:AddToggle({
         end
     end
 })
+
 
 
 MiscSection:AddButton({
