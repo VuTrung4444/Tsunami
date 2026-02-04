@@ -172,7 +172,7 @@ end
 
 -- Toggle ESP
 Ect:AddToggle({
-    Name = "ESP Rare Brainrots & Lucky Blocks",
+    Name = "ESP",
     Default = false,
     Callback = function(value)
         ESPEnabled = value
@@ -181,7 +181,7 @@ Ect:AddToggle({
             -- Bật ESP
             updateESP()
             
-            -- Tạo loop cập nhật mỗi 5 giây
+
             ESPConnection = task.spawn(function()
                 while ESPEnabled do
                     task.wait(5)
