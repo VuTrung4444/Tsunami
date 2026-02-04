@@ -1,0 +1,315 @@
+repeat task.wait() until game:IsLoaded()
+
+local Library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Subs = Library.subs
+local IsOpen = Subs.Wait
+
+
+    local Window = Library:CreateWindow({
+        Name = "HackerLor",
+        Themeable = {
+            Info = "VTrungHackerLor",
+            Credit = false,
+            Background = "",
+            Visible = true
+        }
+    })
+
+	--// Main Tab \\--
+	local MainTab = Window:CreateTab({Name = "Main"})
+	local MainSection = MainTab:CreateSection({Name = "Farming"})
+	local Settings = MainTab:CreateSection({Name = "Settings"})
+	local KA = MainTab:CreateSection({Name = "Kill Aura", Side = "Left"})
+	local AutoMission = MainTab:CreateSection({Name = "Auto", Side = "Right"})
+	local Ect = MainTab:CreateSection({Name = "Ect", Side = "Left"})
+	local Calamity = MainTab:CreateSection({Name = "Calamity", Side = "Right"})
+	local DailySection = MainTab:CreateSection({Name = "Spin", Side = "Left"})
+	local Teleports = MainTab:CreateSection({Name = "Teleports", Side = "Right"})
+
+
+	--// Misc Tab \\--
+	local MiscTab = Window:CreateTab({Name = "Misc"})
+	local MiscSection = MiscTab:CreateSection({Name = "Misc"})
+	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump", Side = "Right"})
+
+
+local Noclip = nil
+local Clip = nil
+
+function noclip()
+    Clip = false
+    local function Nocl()
+        if Clip == false and game.Players.LocalPlayer.Character ~= nil then
+            for _,v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                if v:IsA('BasePart') and v.CanCollide and v.Name ~= floatName then
+                    v.CanCollide = false
+                end
+            end
+        end
+        wait(0.21) 
+    end
+    Noclip = game:GetService('RunService').Stepped:Connect(Nocl)
+end
+
+function clip()
+    if Noclip then Noclip:Disconnect() end
+    Clip = true
+end
+
+Ect:AddToggle({
+    Name = "Noclip",
+    Default = false,
+    Callback = function(value)
+        if value then
+            noclip()
+        else
+            clip()
+        end
+    end
+})
+
+	--// NoClip \\--
+	local antifallActive = false 
+	spawn(function()
+		game:GetService("RunService").Stepped:Connect(function()
+			if getgenv().Farm or getgenv().MoveAround or getgenv().AutoCollect or getgenv().AutoMoveEnabled then
+				for _, v in pairs(game:GetService("Players").LocalPlayer.Character:GetDescendants()) do
+					if v:IsA("BasePart") then
+						v.CanCollide = false    
+					end
+					if v:IsA("Humanoid") then
+						v:ChangeState(11)
+					end
+				end
+				if not antifallActive then  -- Check if no clip is already active
+					antifallActive = true
+					EnableAntiFall()
+				end
+			else
+				if antifallActive then
+					antifallActive = false
+					DisableAntiFall()
+				end
+			end
+		end)
+	end)
+
+
+local ESPEnabled = false
+local ESPLabels = {}
+local ESPConnection
+
+local function createESPLabel(instance)
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = "ESP_" .. instance.Name
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Size = UDim2.new(0, 100, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 2, 0)
+    billboardGui.Adornee = instance
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Name = "Label"
+    textLabel.Size = UDim2.new(1, 0, 1, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = instance.Name
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+    textLabel.TextStrokeTransparency = 0
+    textLabel.TextScaled = true
+    textLabel.Font = Enum.Font.SourceSansBold
+    textLabel.Parent = billboardGui
+    
+    billboardGui.Parent = game:GetService("CoreGui")
+    
+    return billboardGui
+end
+
+
+local function clearESP()
+    for _, label in pairs(ESPLabels) do
+        if label and label.Parent then
+            label:Destroy()
+        end
+    end
+    ESPLabels = {}
+end
+
+local function updateESP()
+    if not ESPEnabled then return end
+    
+    clearESP()
+    
+    local Workspace = game:GetService("Workspace")
+    
+
+    local activeBrainrots = Workspace:FindFirstChild("ActiveBrainrots")
+    if activeBrainrots then
+        for _, child in pairs(activeBrainrots:GetChildren()) do
+            if child.Parent.Name == "RenderedBrainrot" or child.Parent == activeBrainrots then
+                local espLabel = createESPLabel(child)
+                table.insert(ESPLabels, espLabel)
+            end
+        end
+    end
+    
+
+    local activeLuckyBlocks = Workspace:FindFirstChild("ActiveLuckyBlocks")
+    if activeLuckyBlocks then
+        for _, child in pairs(activeLuckyBlocks:GetChildren()) do
+            if child.Parent.Name == "ActiveLuckyBlocks" then
+                local espLabel = createESPLabel(child)
+                table.insert(ESPLabels, espLabel)
+            end
+        end
+    end
+end
+
+
+Ect:AddToggle({
+    Name = "ESP",
+    Default = false,
+    Callback = function(value)
+        ESPEnabled = value
+        
+        if ESPEnabled then
+            updateESP()
+            
+            ESPConnection = task.spawn(function()
+                while ESPEnabled do
+                    task.wait(5)
+                    if ESPEnabled then
+                        updateESP()
+                    end
+                end
+            end)
+
+        else
+            -- Tắt ESP
+            clearESP()
+            
+            -- Dừng loop cập nhật
+            if ESPConnection then
+                task.cancel(ESPConnection)
+                ESPConnection = nil
+            end
+
+        end
+    end
+})
+
+
+MiscSection:AddButton({
+	Name = "No Fog",
+	Flag = "NF",
+	Keybind = false,
+	Callback = function()
+		local Lighting = game:GetService("Lighting")
+			for _, light in ipairs(Lighting:GetChildren()) do
+				if light:IsA("Atmosphere") or string.find(light.Name, "Blur") or string.find(light.Name, "Bloom") then
+					light:Destroy()
+				end
+			Lighting.FogEnd = 1000000
+		end
+	end
+})
+
+MiscSection:AddButton({
+    Name = "Server Hop",
+    Callback = function()
+        local TeleportService = game:GetService("TeleportService")
+        local Players = game:GetService("Players")
+        
+        wait(0.5)
+        TeleportService:Teleport(game.PlaceId, Players.LocalPlayer)
+    end
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local plr = Players.LocalPlayer
+local Character = plr.Character or plr.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Giá trị mặc định
+local WalkSpeed = 100
+local JumpPower = 100
+
+-- Hàm cập nhật Humanoid mới khi respawn
+local function updateHumanoid(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+
+
+    Humanoid.WalkSpeed = WalkSpeed
+    Humanoid.JumpPower = JumpPower
+
+
+    Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+        if Humanoid.WalkSpeed ~= WalkSpeed then
+            Humanoid.WalkSpeed = WalkSpeed
+        end
+    end)
+
+    Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+        if Humanoid.JumpPower ~= JumpPower then
+            Humanoid.JumpPower = JumpPower
+        end
+    end)
+end
+
+
+plr.CharacterAdded:Connect(updateHumanoid)
+updateHumanoid(Character)
+
+-- Khi người dùng thay đổi slider
+SpeedAndJump:AddSlider({
+    Name = "WalkSpeed",
+    Value = WalkSpeed,
+    Min = 16,
+    Max = 300,
+    Flag = "WalkSpeed",
+    Textbox = true,
+    Callback = function(state)
+        WalkSpeed = state
+        if Humanoid then
+            Humanoid.WalkSpeed = WalkSpeed
+        end
+    end
+})
+
+SpeedAndJump:AddSlider({
+    Name = "JumpPower",
+    Value = JumpPower,
+    Min = 50,
+    Max = 500,
+    Flag = "JumpPower",
+    Textbox = true,
+    Callback = function(state)
+        JumpPower = state
+        if Humanoid then
+            Humanoid.JumpPower = JumpPower
+        end
+    end
+})
+
+
+local VirtualUser = game:GetService("VirtualUser")
+	local Players = game:GetService("Players")
+
+
+
+	local function naturalWaitTime()
+		local baseTime = 600
+		local offset = math.random(-120, 180)
+		return math.max(300, baseTime + offset)
+	end
+
+	spawn(function()
+		while true do
+			wait(naturalWaitTime()) 
+			if Players.LocalPlayer and Players.LocalPlayer.Character then
+				VirtualUser:CaptureController()
+				VirtualUser:ClickButton2(Vector2.new(math.random(100, 1820), math.random(100, 980))) 
+			end
+		end
+	end)
