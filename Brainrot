@@ -133,6 +133,28 @@ local function clearESP()
     ESPLabels = {}
 end
 
+-- Hàm lấy Rate text từ model con
+local function getRateText(parentModel)
+    -- Quét tất cả các model con (như "Mastodontico Telepiedone")
+    for _, childModel in pairs(parentModel:GetChildren()) do
+        -- Tìm ModelExtents trong model con
+        local modelExtents = childModel:FindFirstChild("ModelExtents")
+        if modelExtents then
+            local statsGui = modelExtents:FindFirstChild("StatsGui")
+            if statsGui then
+                local frame = statsGui:FindFirstChild("Frame")
+                if frame then
+                    local rate = frame:FindFirstChild("Rate")
+                    if rate and rate:IsA("TextLabel") then
+                        return rate.Text, childModel
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
 -- Hàm cập nhật ESP
 local function updateESP()
     if not ESPEnabled then return end
@@ -152,18 +174,15 @@ local function updateESP()
             if folder then
                 -- Hiển thị ESP cho tất cả đối tượng con trong folder này
                 for _, brainrot in pairs(folder:GetChildren()) do
-                    -- Tìm RenderedBrainrot bên trong
-                    local renderedBrainrot = brainrot:FindFirstChild("RenderedBrainrot")
-                    if renderedBrainrot then
-                        -- Lấy tệp con đầu tiên của RenderedBrainrot
-                        local childObject = renderedBrainrot:GetChildren()[1]
-                        if childObject then
-                            -- Tạo ESP gắn vào brainrot nhưng hiển thị tên của childObject
-                            local espLabel = createESPLabel(brainrot, childObject.Name)
-                            table.insert(ESPLabels, espLabel)
-                        end
+                    -- Lấy Rate text từ các model con
+                    local rateText, targetModel = getRateText(brainrot)
+                    
+                    if rateText and targetModel then
+                        -- Tạo ESP gắn vào model con (như "Mastodontico Telepiedone") và hiển thị Rate
+                        local espLabel = createESPLabel(targetModel, rateText)
+                        table.insert(ESPLabels, espLabel)
                     else
-                        -- Nếu không có RenderedBrainrot, hiển thị tên bình thường
+                        -- Fallback: hiển thị tên bình thường nếu không tìm thấy Rate
                         local espLabel = createESPLabel(brainrot)
                         table.insert(ESPLabels, espLabel)
                     end
@@ -190,10 +209,8 @@ Ect:AddToggle({
         ESPEnabled = value
         
         if ESPEnabled then
-
             updateESP()
             
-
             ESPConnection = task.spawn(function()
                 while ESPEnabled do
                     task.wait(5)
@@ -203,17 +220,13 @@ Ect:AddToggle({
                 end
             end)
             
-
         else
-
             clearESP()
             
-
             if ESPConnection then
                 task.cancel(ESPConnection)
                 ESPConnection = nil
             end
-
         end
     end
 })
