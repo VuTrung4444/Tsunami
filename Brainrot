@@ -166,7 +166,7 @@ local function updateESP()
     
     if activeBrainrots then
         -- Danh sách các folder cần quét
-        local targetFolders = {"Celestial", "Divine", "Secret"}
+        local targetFolders = {"Celestial", "Cosmic", "Divine", "Secret"}
         
         -- Quét từng folder cụ thể
         for _, folderName in pairs(targetFolders) do
@@ -234,9 +234,21 @@ Ect:AddToggle({
 Ect:AddButton({
     Name = "Xóa Walls",
     Callback = function()
-        local vipWalls = workspace:FindFirstChild("DefaultMap_SharedInstances")
-        if vipWalls then
-            vipWalls = vipWalls:FindFirstChild("VIPWalls")
+
+        local defaultMap = workspace:FindFirstChild("DefaultMap_SharedInstances")
+        if defaultMap then
+            local vipWalls = defaultMap:FindFirstChild("VIPWalls")
+            if vipWalls then
+                for _, wall in pairs(vipWalls:GetChildren()) do
+                    wall:Destroy()
+                end
+            end
+        end
+        
+
+        local moneyMap = workspace:FindFirstChild("MoneyMap_SharedInstances")
+        if moneyMap then
+            local vipWalls = moneyMap:FindFirstChild("VIPWalls")
             if vipWalls then
                 for _, wall in pairs(vipWalls:GetChildren()) do
                     wall:Destroy()
