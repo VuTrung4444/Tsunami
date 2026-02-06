@@ -244,7 +244,16 @@ Ect:AddButton({
                 end
             end
         end
-        
+
+        local RadMap = workspace:FindFirstChild("RadioactiveMap_SharedInstances")
+        if defaultMap then
+            local vipWalls = RadMap:FindFirstChild("VIPWalls")
+            if vipWalls then
+                for _, wall in pairs(vipWalls:GetChildren()) do
+                    wall:Destroy()
+                end
+            end
+        end
 
         local moneyMap = workspace:FindFirstChild("MoneyMap_SharedInstances")
         if moneyMap then
