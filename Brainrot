@@ -218,7 +218,20 @@ Ect:AddToggle({
     end
 })
 
-
+Ect:AddButton({
+    Name = "Xóa Walls",
+    Callback = function()
+        local vipWalls = workspace:FindFirstChild("DefaultMap_SharedInstances")
+        if vipWalls then
+            vipWalls = vipWalls:FindFirstChild("VIPWalls")
+            if vipWalls then
+                for _, wall in pairs(vipWalls:GetChildren()) do
+                    wall:Destroy()
+                end
+            end
+        end
+    end
+})
 
 MiscSection:AddButton({
 	Name = "No Fog",
