@@ -166,7 +166,7 @@ local function updateESP()
     
     if activeBrainrots then
         -- Danh sách các folder cần quét
-        local targetFolders = {"Celestial", "Cosmic", "Divine", "Secret"}
+        local targetFolders = {"Celestial", "Divine", "Secret"}
         
         -- Quét từng folder cụ thể
         for _, folderName in pairs(targetFolders) do
