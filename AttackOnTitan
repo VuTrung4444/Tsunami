@@ -82,7 +82,7 @@ Ect:AddToggle({
 						v:ChangeState(11)
 					end
 				end
-				if not antifallActive then  -- Check if no clip is already active
+				if not antifallActive then
 					antifallActive = true
 					EnableAntiFall()
 				end
@@ -95,7 +95,7 @@ Ect:AddToggle({
 		end)
 	end)
 
-
+-- AUTO ATTACK TITAN (ĐÃ SỬA)
 KA:AddToggle({
     Name = "Auto Attack Titan",
     Default = false,
@@ -103,7 +103,6 @@ KA:AddToggle({
         getgenv().FloatAboveTitan = Value
         
         if Value then
-            -- Khởi động script khi bật toggle
             task.spawn(function()
                 local Players = game:GetService("Players")
                 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -190,6 +189,10 @@ KA:AddToggle({
                     -- Phase 1: Float above titan and follow it
                     local startTime = tick()
                     while tick() - startTime < 1 and getgenv().FloatAboveTitan do
+                        if getgenv().RefillInProgress then
+                            return false
+                        end
+                        
                         if not isTitanAlive(titan) then
                             return false
                         end
@@ -201,7 +204,7 @@ KA:AddToggle({
                         task.wait(0.05)
                     end
                     
-                    if not getgenv().FloatAboveTitan then return false end
+                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
                     if not isTitanAlive(titan) then return false end
                     
                     -- Phase 2: Descend to attack position while following nape
@@ -211,7 +214,7 @@ KA:AddToggle({
                         local delay = 0.1 / steps
                         
                         for i = 1, steps do
-                            if not getgenv().FloatAboveTitan then return false end
+                            if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
                             if not isTitanAlive(titan) then return false end
                             
                             titanNape = getTitanNape(titan)
@@ -227,15 +230,14 @@ KA:AddToggle({
                         end
                     end
                     
-                    if not getgenv().FloatAboveTitan then return false end
+                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
                     if not isTitanAlive(titan) then return false end
                     
                     -- Phase 3: Hold position at nape while following movement
                     local holdStartTime = tick()
                     while tick() - holdStartTime < 0.3 and getgenv().FloatAboveTitan do
-                        if not isTitanAlive(titan) then
-                            return false
-                        end
+                        if getgenv().RefillInProgress then return false end
+                        if not isTitanAlive(titan) then return false end
                         
                         titanNape = getTitanNape(titan)
                         if titanNape then
@@ -244,7 +246,7 @@ KA:AddToggle({
                         task.wait(0.03)
                     end
                     
-                    if not getgenv().FloatAboveTitan then return false end
+                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
                     
                     -- Phase 4: Return to high position while following
                     if isTitanAlive(titan) then
@@ -252,7 +254,7 @@ KA:AddToggle({
                         local returnDelay = 0.1 / returnSteps
                         
                         for i = 1, returnSteps do
-                            if not getgenv().FloatAboveTitan then return false end
+                            if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
                             if not isTitanAlive(titan) then return false end
                             
                             titanNape = getTitanNape(titan)
@@ -272,6 +274,16 @@ KA:AddToggle({
 
                 -- Main loop
                 while getgenv().FloatAboveTitan do
+                    -- ĐỢI NẾU AUTO REFILL ĐANG HOẠT ĐỘNG
+                    while getgenv().RefillInProgress and getgenv().FloatAboveTitan do
+                        task.wait(0.5)
+                    end
+                    
+                    -- KIỂM TRA LẠI SAU KHI CHỜ
+                    if not getgenv().FloatAboveTitan then
+                        break
+                    end
+                    
                     local character, hrp = getCharacterAndHRP()
                     
                     if hrp then
@@ -285,7 +297,7 @@ KA:AddToggle({
                                 task.wait(0.5)
                             end
                         else
-                            break
+                            task.wait(1)
                         end
                     else
                         task.wait(1)
@@ -301,7 +313,6 @@ KA:AddToggle({
                 end
             end)
         else
-            -- Khi tắt toggle, cleanup BodyPosition
             task.spawn(function()
                 local Players = game:GetService("Players")
                 local player = Players.LocalPlayer
@@ -317,6 +328,220 @@ KA:AddToggle({
         end
     end
 })
+
+-- AUTO REFILL (ĐÃ SỬA)
+KA:AddToggle({
+    Name = "Auto ReFill",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoReloadBlades = Value
+        
+        if Value then
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                local workspace = game:GetService("Workspace")
+                local player = Players.LocalPlayer
+
+                local function getBladesSetsText()
+                    local success, result = pcall(function()
+                        local gui = player.PlayerGui:FindFirstChild("Interface")
+                        if not gui then return nil end
+                        
+                        local hud = gui:FindFirstChild("HUD")
+                        if not hud then return nil end
+                        
+                        local main = hud:FindFirstChild("Main")
+                        if not main then return nil end
+                        
+                        local top = main:FindFirstChild("Top")
+                        if not top then return nil end
+                        
+                        local blades = top:FindFirstChild("Blades")
+                        if not blades then return nil end
+                        
+                        local sets = blades:FindFirstChild("Sets")
+                        if not sets then return nil end
+                        
+                        return sets.Text
+                    end)
+                    
+                    if success and result ~= nil then
+                        return result
+                    else
+                        return nil
+                    end
+                end
+
+                local function teleportToGasTanks()
+                    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then 
+                        print("[Auto ReFill] ❌ HRP not found")
+                        return false 
+                    end
+                    
+                    print("[Auto ReFill] Current position:", hrp.Position)
+                    
+                    -- XÓA BODYPOSITION TRƯỚC KHI TELEPORT
+                    local bp = hrp:FindFirstChild("FloatBodyPosition")
+                    if bp then
+                        print("[Auto ReFill] Removing BodyPosition...")
+                        bp:Destroy()
+                        task.wait(0.2)
+                    end
+                    
+                    local success, result = pcall(function()
+                        local gasTanks = workspace.Unclimbable.Reloads.GasTanks
+                        
+                        print("[Auto ReFill] Found GasTanks:", gasTanks.Name, gasTanks.ClassName)
+                        
+                        local offset = Vector3.new(0, 0, 0)
+                        
+                        if gasTanks:IsA("BasePart") then
+                            print("[Auto ReFill] GasTanks is BasePart")
+                            hrp.CFrame = gasTanks.CFrame + offset
+                            print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
+                            return true
+                            
+                        elseif gasTanks:IsA("Model") then
+                            print("[Auto ReFill] GasTanks is Model")
+                            
+                            if gasTanks.PrimaryPart then
+                                print("[Auto ReFill] Using PrimaryPart")
+                                hrp.CFrame = gasTanks.PrimaryPart.CFrame + offset
+                                print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
+                                return true
+                            else
+                                local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
+                                if part then
+                                    print("[Auto ReFill] Using first BasePart:", part.Name)
+                                    hrp.CFrame = part.CFrame + offset
+                                    print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
+                                    return true
+                                end
+                            end
+                        else
+                            print("[Auto ReFill] GasTanks is", gasTanks.ClassName)
+                            local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
+                            if part then
+                                print("[Auto ReFill] Using first BasePart:", part.Name)
+                                hrp.CFrame = part.CFrame + offset
+                                print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
+                                return true
+                            end
+                        end
+                        
+                        print("[Auto ReFill] ❌ Could not find suitable part")
+                        return false
+                    end)
+                    
+                    if not success then
+                        warn("[Auto ReFill] Error:", result)
+                        return false
+                    end
+                    
+                    return result
+                end
+
+                local function pressR()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+                end
+
+                local function reloadBlades()
+                    print("[Auto ReFill] === STARTING RELOAD ===")
+                    local teleportSuccess = teleportToGasTanks()
+                    
+                    if teleportSuccess then
+                        print("[Auto ReFill] Waiting before pressing R...")
+                        task.wait(0.5)
+                        
+                        print("[Auto ReFill] Pressing R...")
+                        pressR()
+                        
+                        task.wait(0.5)
+                        print("[Auto ReFill] ✓ Reload complete!")
+                        return true
+                    else
+                        print("[Auto ReFill] ❌ Teleport failed!")
+                    end
+                    
+                    return false
+                end
+
+                -- Main monitoring loop
+                while getgenv().AutoReloadBlades do
+                    local setsText = getBladesSetsText()
+                    
+                    if setsText then
+                        print("[Auto ReFill] Current blade sets:", setsText)
+                        
+                        if setsText == "0/3" then
+                            print("[Auto ReFill] ⚠️ OUT OF BLADES DETECTED!")
+                            
+                            -- Lưu trạng thái toggle Auto Attack Titan
+                            local wasAutoAttackEnabled = getgenv().FloatAboveTitan
+                            
+                            -- BẬT FLAG
+                            print("[Auto ReFill] Setting RefillInProgress = true")
+                            getgenv().RefillInProgress = true
+                            
+                            -- ĐỢI AUTO ATTACK DỪNG HOÀN TOÀN
+                            print("[Auto ReFill] Waiting for Auto Attack to stop...")
+                            task.wait(1)
+                            
+                            -- Thực hiện reload
+                            local success = reloadBlades()
+                            
+                            -- TẮT FLAG
+                            print("[Auto ReFill] Setting RefillInProgress = false")
+                            getgenv().RefillInProgress = false
+                            
+                            -- ĐỢI BLADE SETS TRỞ VỀ 3/3
+                            if success then
+                                print("[Auto ReFill] Waiting for blades to refill to 3/3...")
+                                local waitTime = 0
+                                while waitTime < 10 and getgenv().AutoReloadBlades do
+                                    local currentSets = getBladesSetsText()
+                                    print("[Auto ReFill] Checking sets:", currentSets)
+                                    
+                                    if currentSets == "3/3" then
+                                        print("[Auto ReFill] ✓ Blades refilled to 3/3!")
+                                        break
+                                    end
+                                    
+                                    task.wait(0.5)
+                                    waitTime = waitTime + 0.5
+                                end
+                                
+                                -- Auto Attack sẽ tự động tiếp tục nếu toggle vẫn bật
+                                if wasAutoAttackEnabled and getgenv().FloatAboveTitan then
+                                    print("[Auto ReFill] Auto Attack will resume now")
+                                    task.wait(0.5)
+                                end
+                                
+                                task.wait(2)
+                            else
+                                task.wait(1)
+                            end
+                        end
+                    end
+                    
+                    task.wait(2)
+                end
+                
+                -- Cleanup khi tắt Auto ReFill
+                print("[Auto ReFill] Toggle turned off, cleaning up...")
+                getgenv().RefillInProgress = false
+            end)
+        else
+            -- Tắt flag khi tắt toggle
+            getgenv().RefillInProgress = false
+        end
+    end
+})
+
 
 KA:AddToggle({
     Name = "Auto Replace Blade",
@@ -388,140 +613,10 @@ KA:AddToggle({
         end
     end
 })
-KA:AddToggle({
-    Name = "Auto ReFill",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AutoReloadBlades = Value
-        
-        if Value then
-            task.spawn(function()
-                local Players = game:GetService("Players")
-                local VirtualInputManager = game:GetService("VirtualInputManager")
-                local workspace = game:GetService("Workspace")
-                local player = Players.LocalPlayer
-
-                local function getBladesSetsText()
-                    local success, result = pcall(function()
-                        local gui = player.PlayerGui:FindFirstChild("Interface")
-                        if not gui then return nil end
-                        
-                        local hud = gui:FindFirstChild("HUD")
-                        if not hud then return nil end
-                        
-                        local main = hud:FindFirstChild("Main")
-                        if not main then return nil end
-                        
-                        local top = main:FindFirstChild("Top")
-                        if not top then return nil end
-                        
-                        local blades = top:FindFirstChild("Blades")
-                        if not blades then return nil end
-                        
-                        local sets = blades:FindFirstChild("Sets")
-                        if not sets then return nil end
-                        
-                        return sets.Text
-                    end)
-                    
-                    if success and result ~= nil then
-                        return result
-                    else
-                        return nil
-                    end
-                end
-
-                local function teleportToGasTanks()
-                    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-                    if not hrp then 
-                        return false 
-                    end
-                    
-                    local success, result = pcall(function()
-                        local gasTanks = workspace.Unclimbable.Reloads.GasTanks
-                        
-                        local offset = Vector3.new(0, 0, 0)
-                        
-                        if gasTanks:IsA("BasePart") then
-                            hrp.CFrame = gasTanks.CFrame + offset
-                            return true
-                            
-                        elseif gasTanks:IsA("Model") then
-                            if gasTanks.PrimaryPart then
-                                hrp.CFrame = gasTanks.PrimaryPart.CFrame + offset
-                                return true
-                            else
-                                local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
-                                if part then
-                                    hrp.CFrame = part.CFrame + offset
-                                    return true
-                                end
-                            end
-                        else
-                            local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
-                            if part then
-                                hrp.CFrame = part.CFrame + offset
-                                return true
-                            end
-                        end
-                        
-                        return false
-                    end)
-                    
-                    if not success then
-                        return false
-                    end
-                    
-                    return result
-                end
-
-                local function pressR()
-                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
-                    task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
-                end
-
-                local function reloadBlades()
-
-                    local teleportSuccess = teleportToGasTanks()
-                    
-                    if teleportSuccess then
-                        task.wait(0.5)
-                        
-                        -- Nhấn R để reload
-                        pressR()
-                        
-                        return true
-                    end
-                    
-                    return false
-                end
-
-                -- Main monitoring loop
-                while getgenv().AutoReloadBlades do
-                    local setsText = getBladesSetsText()
-                    
-                    if setsText then
-
-                        if setsText == "0/3" then
-                            local success = reloadBlades()
-                            
-                            if success then
-                                task.wait(3)
-                            else
-                                task.wait(1)
-                            end
-                        end
-                    end
-                    
-                    task.wait(1)
-                end
-            end)
-        end
-    end
-})
 
 
+
+-- AUTO REPLAY
 getgenv().AutoReplay = false
 local player = game.Players.LocalPlayer
 
@@ -553,7 +648,6 @@ function StartAutoReplay()
             local dropsExist = HasDrops()
             local health = GetHealth()
 
-
             local remote = replicatedStorage
                 :WaitForChild("Remotes")
                 :WaitForChild("Server")
@@ -563,7 +657,6 @@ function StartAutoReplay()
             if readyReplay and readyReplay.Value == 0 then
                 task.wait(4)
                 local dropsExistAfterDelay = HasDrops()
-
 
                 if not dropsExistAfterDelay then
                     remote:FireServer()
@@ -591,6 +684,7 @@ AutoMission:AddToggle({
 })
 
 
+-- SPEED & JUMP
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -598,30 +692,24 @@ local plr = Players.LocalPlayer
 local Character = plr.Character or plr.CharacterAdded:Wait()
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- Giá trị mặc định
 local WalkSpeed = 150
 local JumpPower = 100
 local isEnabled = false
 
--- Các connection để có thể disconnect
 local walkSpeedConnection
 local jumpPowerConnection
 
--- Hàm cập nhật Humanoid mới khi respawn
 local function updateHumanoid(char)
     Character = char
     Humanoid = char:WaitForChild("Humanoid")
     
-    -- Disconnect các connection cũ nếu có
     if walkSpeedConnection then walkSpeedConnection:Disconnect() end
     if jumpPowerConnection then jumpPowerConnection:Disconnect() end
     
-    -- Áp dụng giá trị nếu đang bật
     if isEnabled then
         Humanoid.WalkSpeed = WalkSpeed
         Humanoid.JumpPower = JumpPower
         
-        -- Theo dõi khi WalkSpeed hoặc JumpPower bị reset
         walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
             if Humanoid.WalkSpeed ~= WalkSpeed then
                 Humanoid.WalkSpeed = WalkSpeed
@@ -639,7 +727,6 @@ end
 plr.CharacterAdded:Connect(updateHumanoid)
 updateHumanoid(Character)
 
--- Xử lý phím P để bật/tắt
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     
@@ -648,11 +735,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         
         if Humanoid then
             if isEnabled then
-                -- Bật: áp dụng speed và jump tùy chỉnh
                 Humanoid.WalkSpeed = WalkSpeed
                 Humanoid.JumpPower = JumpPower
                 
-                -- Theo dõi khi bị reset
                 walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
                     if Humanoid.WalkSpeed ~= WalkSpeed then
                         Humanoid.WalkSpeed = WalkSpeed
@@ -665,10 +750,8 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                     end
                 end)
             else
-                -- Tắt: ngắt kết nối, để hệ thống tự áp dụng giá trị mặc định
                 if walkSpeedConnection then walkSpeedConnection:Disconnect() end
                 if jumpPowerConnection then jumpPowerConnection:Disconnect() end
-
             end
         end
     end
@@ -705,23 +788,22 @@ SpeedAndJump:AddSlider({
 })
 
 
+-- ANTI AFK
 local VirtualUser = game:GetService("VirtualUser")
-	local Players = game:GetService("Players")
+local Players = game:GetService("Players")
 
+local function naturalWaitTime()
+    local baseTime = 600
+    local offset = math.random(-120, 180)
+    return math.max(300, baseTime + offset)
+end
 
-
-	local function naturalWaitTime()
-		local baseTime = 600
-		local offset = math.random(-120, 180)
-		return math.max(300, baseTime + offset)
-	end
-
-	spawn(function()
-		while true do
-			wait(naturalWaitTime()) 
-			if Players.LocalPlayer and Players.LocalPlayer.Character then
-				VirtualUser:CaptureController()
-				VirtualUser:ClickButton2(Vector2.new(math.random(100, 1820), math.random(100, 980))) 
-			end
-		end
-	end)
+spawn(function()
+    while true do
+        wait(naturalWaitTime()) 
+        if Players.LocalPlayer and Players.LocalPlayer.Character then
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new(math.random(100, 1820), math.random(100, 980))) 
+        end
+    end
+end)
