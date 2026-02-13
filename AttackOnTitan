@@ -95,254 +95,351 @@ Ect:AddToggle({
 		end)
 	end)
 
--- AUTO ATTACK TITAN (ĐÃ SỬA)
+
+local AttackLoop = nil
+local AttackLoopRunning = false
+
+local function stopAttackLoop()
+    getgenv().FloatAboveTitan = false
+    if AttackLoop then
+        task.cancel(AttackLoop)
+        AttackLoop = nil
+    end
+    AttackLoopRunning = false
+    
+    local Players = game:GetService("Players")
+    local player = Players.LocalPlayer
+    local character = player.Character
+    if character then
+        local hrp = character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local bp = hrp:FindFirstChild("FloatBodyPosition")
+            if bp then bp:Destroy() end
+        end
+    end
+end
+
+local function startAttackLoop()
+    if AttackLoopRunning then return end
+    AttackLoopRunning = true
+    
+    AttackLoop = task.spawn(function()
+        local Players = game:GetService("Players")
+        local VirtualInputManager = game:GetService("VirtualInputManager")
+        local workspace = game:GetService("Workspace")
+        local player = Players.LocalPlayer
+        
+        local function getCharacterAndHRP()
+            local character = player.Character
+            if not character then return nil, nil end
+            local hrp = character:FindFirstChild("HumanoidRootPart")
+            return character, hrp
+        end
+        
+        local function getTitanNape(titan)
+            if not titan then return nil end
+            local hitboxes = titan:FindFirstChild("Hitboxes")
+            if not hitboxes then return nil end
+            local hit = hitboxes:FindFirstChild("Hit")
+            if not hit then return nil end
+            local nape = hit:FindFirstChild("Nape")
+            return nape
+        end
+        
+        local function isTitanAlive(titan)
+            if not titan or not titan:IsDescendantOf(workspace) then
+                return false
+            end
+            local humanoid = titan:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                return true
+            end
+            return false
+        end
+        
+        local function getNextTitan()
+            local titans = workspace:FindFirstChild("Titans")
+            if not titans then return nil end
+            
+            for _, titan in ipairs(titans:GetChildren()) do
+                if isTitanAlive(titan) then
+                    local nape = getTitanNape(titan)
+                    if nape then
+                        return titan
+                    end
+                end
+            end
+            
+            return nil
+        end
+        
+        local function setupBodyPosition(hrp)
+            local bp = hrp:FindFirstChild("FloatBodyPosition")
+            if not bp then
+                bp = Instance.new("BodyPosition")
+                bp.Name = "FloatBodyPosition"
+                bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                bp.P = 5e4
+                bp.D = 1000
+                bp.Parent = hrp
+            end
+            return bp
+        end
+        
+        local function removeBodyPosition(hrp)
+            local bp = hrp:FindFirstChild("FloatBodyPosition")
+            if bp then bp:Destroy() end
+        end
+        
+        local function clickMouse()
+            task.wait(0.02)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+        end
+        
+        local function getBladesSetsText()
+            local success, result = pcall(function()
+                local gui = player.PlayerGui:FindFirstChild("Interface")
+                if not gui then return nil end
+                
+                local hud = gui:FindFirstChild("HUD")
+                if not hud then return nil end
+                
+                local main = hud:FindFirstChild("Main")
+                if not main then return nil end
+                
+                local top = main:FindFirstChild("Top")
+                if not top then return nil end
+                
+                local blades = top:FindFirstChild("Blades")
+                if not blades then return nil end
+                
+                local sets = blades:FindFirstChild("Sets")
+                if not sets then return nil end
+                
+                return sets.Text
+            end)
+            
+            if success and result ~= nil then
+                return result
+            else
+                return nil
+            end
+        end
+        
+        local function attackTitan(titan, hrp, bp)
+            if not isTitanAlive(titan) then
+                return false
+            end
+            
+            local titanNape = getTitanNape(titan)
+            if not titanNape then return false end
+            
+            -- Phase 1: Float above titan and follow it
+            local startTime = tick()
+            while tick() - startTime < 1 and getgenv().FloatAboveTitan do
+                local currentSets = getBladesSetsText()
+                if currentSets then
+                    local cleanSets = string.gsub(currentSets, "%s+", "")
+                    if cleanSets == "0/3" then
+                        return false
+                    end
+                end
+                
+                if not isTitanAlive(titan) then
+                    return false
+                end
+                titanNape = getTitanNape(titan)
+                if titanNape then
+                    local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                    bp.Position = highPosition
+                end
+                task.wait(0.05)
+            end
+            
+            if not getgenv().FloatAboveTitan then return false end
+            if not isTitanAlive(titan) then return false end
+            
+            -- Phase 2: Descend to attack position while following nape
+            titanNape = getTitanNape(titan)
+            if titanNape then
+                local steps = 10
+                local delay = 0.1 / steps
+                
+                for i = 1, steps do
+                    if not getgenv().FloatAboveTitan then return false end
+                    
+                    local currentSets = getBladesSetsText()
+                    if currentSets then
+                        local cleanSets = string.gsub(currentSets, "%s+", "")
+                        if cleanSets == "0/3" then
+                            return false
+                        end
+                    end
+                    
+                    if not isTitanAlive(titan) then return false end
+                    
+                    titanNape = getTitanNape(titan)
+                    if titanNape then
+                        local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                        local targetPosition = titanNape.Position + Vector3.new(10, -5, -5)
+                        local progress = i / steps
+                        local currentPos = highPosition:Lerp(targetPosition, progress)
+                        bp.Position = currentPos
+                    end
+                    clickMouse()
+                    task.wait(delay)
+                end
+            end
+            
+            if not getgenv().FloatAboveTitan then return false end
+            if not isTitanAlive(titan) then return false end
+            
+            -- Phase 3: Hold position at nape while following movement
+            local holdStartTime = tick()
+            while tick() - holdStartTime < 0.3 and getgenv().FloatAboveTitan do
+                local currentSets = getBladesSetsText()
+                if currentSets then
+                    local cleanSets = string.gsub(currentSets, "%s+", "")
+                    if cleanSets == "0/3" then
+                        return false
+                    end
+                end
+                
+                if not isTitanAlive(titan) then return false end
+                
+                titanNape = getTitanNape(titan)
+                if titanNape then
+                    bp.Position = titanNape.Position + Vector3.new(10, -5, -5)
+                end
+                task.wait(0.03)
+            end
+            
+            if not getgenv().FloatAboveTitan then return false end
+            
+            -- Phase 4: Return to high position while following
+            if isTitanAlive(titan) then
+                local returnSteps = 5
+                local returnDelay = 0.1 / returnSteps
+                
+                for i = 1, returnSteps do
+                    if not getgenv().FloatAboveTitan then return false end
+                    
+                    local currentSets = getBladesSetsText()
+                    if currentSets then
+                        local cleanSets = string.gsub(currentSets, "%s+", "")
+                        if cleanSets == "0/3" then
+                            return false
+                        end
+                    end
+                    
+                    if not isTitanAlive(titan) then return false end
+                    
+                    titanNape = getTitanNape(titan)
+                    if titanNape then
+                        local attackPosition = titanNape.Position + Vector3.new(10, -5, -5)
+                        local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                        local progress = i / returnSteps
+                        local currentPos = attackPosition:Lerp(highPosition, progress)
+                        bp.Position = currentPos
+                    end
+                    task.wait(returnDelay)
+                end
+            end
+            
+            return true
+        end
+        
+        -- Main loop
+        while getgenv().FloatAboveTitan do
+            local currentSets = getBladesSetsText()
+            if currentSets then
+                local cleanSets = string.gsub(currentSets, "%s+", "")
+                if cleanSets == "0/3" then
+                    while getgenv().FloatAboveTitan do
+                        task.wait(0.5)
+                        local checkSets = getBladesSetsText()
+                        if checkSets then
+                            local checkCleanSets = string.gsub(checkSets, "%s+", "")
+                            if checkCleanSets ~= "0/3" then
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+            
+            if not getgenv().FloatAboveTitan then
+                break
+            end
+            
+            local character, hrp = getCharacterAndHRP()
+            
+            if hrp then
+                local bp = setupBodyPosition(hrp)
+                local currentTitan = getNextTitan()
+                
+                if currentTitan then
+                    local success = attackTitan(currentTitan, hrp, bp)
+                    
+                    if not success then
+                        task.wait(0.5)
+                    end
+                else
+                    task.wait(1)
+                end
+            else
+                task.wait(1)
+            end
+            
+            task.wait(0.1)
+        end
+        
+        -- Cleanup
+        local character, hrp = getCharacterAndHRP()
+        if hrp then
+            removeBodyPosition(hrp)
+        end
+        
+        AttackLoopRunning = false
+    end)
+end
+
+
 KA:AddToggle({
     Name = "Auto Attack Titan",
     Default = false,
     Callback = function(Value)
         getgenv().FloatAboveTitan = Value
-        
         if Value then
-            task.spawn(function()
-                local Players = game:GetService("Players")
-                local VirtualInputManager = game:GetService("VirtualInputManager")
-                local workspace = game:GetService("Workspace")
-                local player = Players.LocalPlayer
-
-                local function getCharacterAndHRP()
-                    local character = player.Character
-                    if not character then return nil, nil end
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
-                    return character, hrp
-                end
-
-                local function getTitanNape(titan)
-                    if not titan then return nil end
-                    local hitboxes = titan:FindFirstChild("Hitboxes")
-                    if not hitboxes then return nil end
-                    local hit = hitboxes:FindFirstChild("Hit")
-                    if not hit then return nil end
-                    local nape = hit:FindFirstChild("Nape")
-                    return nape
-                end
-
-                local function isTitanAlive(titan)
-                    if not titan or not titan:IsDescendantOf(workspace) then
-                        return false
-                    end
-                    local humanoid = titan:FindFirstChild("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        return true
-                    end
-                    return false
-                end
-
-                local function getNextTitan()
-                    local titans = workspace:FindFirstChild("Titans")
-                    if not titans then return nil end
-                    
-                    for _, titan in ipairs(titans:GetChildren()) do
-                        if isTitanAlive(titan) then
-                            local nape = getTitanNape(titan)
-                            if nape then
-                                return titan
-                            end
-                        end
-                    end
-                    
-                    return nil
-                end
-
-                local function setupBodyPosition(hrp)
-                    local bp = hrp:FindFirstChild("FloatBodyPosition")
-                    if not bp then
-                        bp = Instance.new("BodyPosition")
-                        bp.Name = "FloatBodyPosition"
-                        bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-                        bp.P = 5e4
-                        bp.D = 1000
-                        bp.Parent = hrp
-                    end
-                    return bp
-                end
-
-                local function removeBodyPosition(hrp)
-                    local bp = hrp:FindFirstChild("FloatBodyPosition")
-                    if bp then bp:Destroy() end
-                end
-
-                local function clickMouse()
-                    task.wait(0.02)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.05)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                end
-
-                local function attackTitan(titan, hrp, bp)
-                    if not isTitanAlive(titan) then
-                        return false
-                    end
-                    
-                    local titanNape = getTitanNape(titan)
-                    if not titanNape then return false end
-                    
-                    -- Phase 1: Float above titan and follow it
-                    local startTime = tick()
-                    while tick() - startTime < 1 and getgenv().FloatAboveTitan do
-                        if getgenv().RefillInProgress then
-                            return false
-                        end
-                        
-                        if not isTitanAlive(titan) then
-                            return false
-                        end
-                        titanNape = getTitanNape(titan)
-                        if titanNape then
-                            local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
-                            bp.Position = highPosition
-                        end
-                        task.wait(0.05)
-                    end
-                    
-                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
-                    if not isTitanAlive(titan) then return false end
-                    
-                    -- Phase 2: Descend to attack position while following nape
-                    titanNape = getTitanNape(titan)
-                    if titanNape then
-                        local steps = 10
-                        local delay = 0.1 / steps
-                        
-                        for i = 1, steps do
-                            if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
-                            if not isTitanAlive(titan) then return false end
-                            
-                            titanNape = getTitanNape(titan)
-                            if titanNape then
-                                local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
-                                local targetPosition = titanNape.Position + Vector3.new(10, -5, -5)
-                                local progress = i / steps
-                                local currentPos = highPosition:Lerp(targetPosition, progress)
-                                bp.Position = currentPos
-                            end
-                            clickMouse()
-                            task.wait(delay)
-                        end
-                    end
-                    
-                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
-                    if not isTitanAlive(titan) then return false end
-                    
-                    -- Phase 3: Hold position at nape while following movement
-                    local holdStartTime = tick()
-                    while tick() - holdStartTime < 0.3 and getgenv().FloatAboveTitan do
-                        if getgenv().RefillInProgress then return false end
-                        if not isTitanAlive(titan) then return false end
-                        
-                        titanNape = getTitanNape(titan)
-                        if titanNape then
-                            bp.Position = titanNape.Position + Vector3.new(10, -5, -5)
-                        end
-                        task.wait(0.03)
-                    end
-                    
-                    if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
-                    
-                    -- Phase 4: Return to high position while following
-                    if isTitanAlive(titan) then
-                        local returnSteps = 5
-                        local returnDelay = 0.1 / returnSteps
-                        
-                        for i = 1, returnSteps do
-                            if not getgenv().FloatAboveTitan or getgenv().RefillInProgress then return false end
-                            if not isTitanAlive(titan) then return false end
-                            
-                            titanNape = getTitanNape(titan)
-                            if titanNape then
-                                local attackPosition = titanNape.Position + Vector3.new(10, -5, -5)
-                                local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
-                                local progress = i / returnSteps
-                                local currentPos = attackPosition:Lerp(highPosition, progress)
-                                bp.Position = currentPos
-                            end
-                            task.wait(returnDelay)
-                        end
-                    end
-                    
-                    return true
-                end
-
-                -- Main loop
-                while getgenv().FloatAboveTitan do
-                    -- ĐỢI NẾU AUTO REFILL ĐANG HOẠT ĐỘNG
-                    while getgenv().RefillInProgress and getgenv().FloatAboveTitan do
-                        task.wait(0.5)
-                    end
-                    
-                    -- KIỂM TRA LẠI SAU KHI CHỜ
-                    if not getgenv().FloatAboveTitan then
-                        break
-                    end
-                    
-                    local character, hrp = getCharacterAndHRP()
-                    
-                    if hrp then
-                        local bp = setupBodyPosition(hrp)
-                        local currentTitan = getNextTitan()
-                        
-                        if currentTitan then
-                            local success = attackTitan(currentTitan, hrp, bp)
-                            
-                            if not success then
-                                task.wait(0.5)
-                            end
-                        else
-                            task.wait(1)
-                        end
-                    else
-                        task.wait(1)
-                    end
-                    
-                    task.wait(0.1)
-                end
-                
-                -- Cleanup khi tắt
-                local character, hrp = getCharacterAndHRP()
-                if hrp then
-                    removeBodyPosition(hrp)
+            task.delay(0.1, function()
+                if not AttackLoopRunning then
+                    startAttackLoop()
                 end
             end)
         else
-            task.spawn(function()
-                local Players = game:GetService("Players")
-                local player = Players.LocalPlayer
-                local character = player.Character
-                if character then
-                    local hrp = character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local bp = hrp:FindFirstChild("FloatBodyPosition")
-                        if bp then bp:Destroy() end
-                    end
-                end
-            end)
+            stopAttackLoop()
         end
     end
 })
 
--- AUTO REFILL (ĐÃ SỬA)
+
+
+
 KA:AddToggle({
-    Name = "Auto ReFill",
+    Name = "Auto Refill Blades",
     Default = false,
-    Callback = function(Value)
-        getgenv().AutoReloadBlades = Value
+    Callback = function(enabled)
+        getgenv().AutoRefillEnabled = enabled
         
-        if Value then
+        if enabled then
             task.spawn(function()
                 local Players = game:GetService("Players")
                 local VirtualInputManager = game:GetService("VirtualInputManager")
                 local workspace = game:GetService("Workspace")
                 local player = Players.LocalPlayer
-
+                
                 local function getBladesSetsText()
                     local success, result = pcall(function()
                         local gui = player.PlayerGui:FindFirstChild("Interface")
@@ -372,175 +469,91 @@ KA:AddToggle({
                         return nil
                     end
                 end
-
+                
                 local function teleportToGasTanks()
                     local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
                     if not hrp then 
-                        print("[Auto ReFill] ❌ HRP not found")
                         return false 
-                    end
-                    
-                    print("[Auto ReFill] Current position:", hrp.Position)
-                    
-                    -- XÓA BODYPOSITION TRƯỚC KHI TELEPORT
-                    local bp = hrp:FindFirstChild("FloatBodyPosition")
-                    if bp then
-                        print("[Auto ReFill] Removing BodyPosition...")
-                        bp:Destroy()
-                        task.wait(0.2)
                     end
                     
                     local success, result = pcall(function()
                         local gasTanks = workspace.Unclimbable.Reloads.GasTanks
-                        
-                        print("[Auto ReFill] Found GasTanks:", gasTanks.Name, gasTanks.ClassName)
-                        
                         local offset = Vector3.new(0, 0, 0)
                         
                         if gasTanks:IsA("BasePart") then
-                            print("[Auto ReFill] GasTanks is BasePart")
                             hrp.CFrame = gasTanks.CFrame + offset
-                            print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
                             return true
                             
                         elseif gasTanks:IsA("Model") then
-                            print("[Auto ReFill] GasTanks is Model")
-                            
                             if gasTanks.PrimaryPart then
-                                print("[Auto ReFill] Using PrimaryPart")
                                 hrp.CFrame = gasTanks.PrimaryPart.CFrame + offset
-                                print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
                                 return true
                             else
                                 local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
                                 if part then
-                                    print("[Auto ReFill] Using first BasePart:", part.Name)
                                     hrp.CFrame = part.CFrame + offset
-                                    print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
                                     return true
                                 end
                             end
                         else
-                            print("[Auto ReFill] GasTanks is", gasTanks.ClassName)
                             local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
                             if part then
-                                print("[Auto ReFill] Using first BasePart:", part.Name)
                                 hrp.CFrame = part.CFrame + offset
-                                print("[Auto ReFill] ✓ Teleported to:", hrp.Position)
                                 return true
                             end
                         end
                         
-                        print("[Auto ReFill] ❌ Could not find suitable part")
                         return false
                     end)
                     
                     if not success then
-                        warn("[Auto ReFill] Error:", result)
                         return false
                     end
                     
                     return result
                 end
-
+                
                 local function pressR()
                     VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
                     task.wait(0.1)
                     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
                 end
-
-                local function reloadBlades()
-                    print("[Auto ReFill] === STARTING RELOAD ===")
+                
+                local function refillBlades()
+                    if not getgenv().AutoRefillEnabled then return false end
+                    
                     local teleportSuccess = teleportToGasTanks()
                     
                     if teleportSuccess then
-                        print("[Auto ReFill] Waiting before pressing R...")
                         task.wait(0.5)
-                        
-                        print("[Auto ReFill] Pressing R...")
+                        if not getgenv().AutoRefillEnabled then return false end
                         pressR()
-                        
-                        task.wait(0.5)
-                        print("[Auto ReFill] ✓ Reload complete!")
+                        task.wait(2)
                         return true
                     else
-                        print("[Auto ReFill] ❌ Teleport failed!")
+                        return false
                     end
-                    
-                    return false
                 end
-
-                -- Main monitoring loop
-                while getgenv().AutoReloadBlades do
-                    local setsText = getBladesSetsText()
+                
+                while getgenv().AutoRefillEnabled do
+                    local currentSets = getBladesSetsText()
                     
-                    if setsText then
-                        print("[Auto ReFill] Current blade sets:", setsText)
+                    if currentSets then
+                        local cleanSets = string.gsub(currentSets, "%s+", "")
                         
-                        if setsText == "0/3" then
-                            print("[Auto ReFill] ⚠️ OUT OF BLADES DETECTED!")
-                            
-                            -- Lưu trạng thái toggle Auto Attack Titan
-                            local wasAutoAttackEnabled = getgenv().FloatAboveTitan
-                            
-                            -- BẬT FLAG
-                            print("[Auto ReFill] Setting RefillInProgress = true")
-                            getgenv().RefillInProgress = true
-                            
-                            -- ĐỢI AUTO ATTACK DỪNG HOÀN TOÀN
-                            print("[Auto ReFill] Waiting for Auto Attack to stop...")
-                            task.wait(1)
-                            
-                            -- Thực hiện reload
-                            local success = reloadBlades()
-                            
-                            -- TẮT FLAG
-                            print("[Auto ReFill] Setting RefillInProgress = false")
-                            getgenv().RefillInProgress = false
-                            
-                            -- ĐỢI BLADE SETS TRỞ VỀ 3/3
-                            if success then
-                                print("[Auto ReFill] Waiting for blades to refill to 3/3...")
-                                local waitTime = 0
-                                while waitTime < 10 and getgenv().AutoReloadBlades do
-                                    local currentSets = getBladesSetsText()
-                                    print("[Auto ReFill] Checking sets:", currentSets)
-                                    
-                                    if currentSets == "3/3" then
-                                        print("[Auto ReFill] ✓ Blades refilled to 3/3!")
-                                        break
-                                    end
-                                    
-                                    task.wait(0.5)
-                                    waitTime = waitTime + 0.5
-                                end
-                                
-                                -- Auto Attack sẽ tự động tiếp tục nếu toggle vẫn bật
-                                if wasAutoAttackEnabled and getgenv().FloatAboveTitan then
-                                    print("[Auto ReFill] Auto Attack will resume now")
-                                    task.wait(0.5)
-                                end
-                                
-                                task.wait(2)
-                            else
-                                task.wait(1)
-                            end
+                        if cleanSets == "0/3" then
+                            if not getgenv().AutoRefillEnabled then break end
+                            refillBlades()
                         end
                     end
                     
-                    task.wait(2)
+                    task.wait(1)
                 end
-                
-                -- Cleanup khi tắt Auto ReFill
-                print("[Auto ReFill] Toggle turned off, cleaning up...")
-                getgenv().RefillInProgress = false
             end)
-        else
-            -- Tắt flag khi tắt toggle
-            getgenv().RefillInProgress = false
         end
     end
 })
+
 
 
 KA:AddToggle({
