@@ -297,7 +297,7 @@ local function startAttackLoop()
             
 
             local holdStartTime = tick()
-            while tick() - holdStartTime < 0.2 and getgenv().FloatAboveTitan do
+            while tick() - holdStartTime < 0.1 and getgenv().FloatAboveTitan do
                 local currentSets = getBladesSetsText()
                 if currentSets then
                     local cleanSets = string.gsub(currentSets, "%s+", "")
@@ -480,7 +480,7 @@ KA:AddToggle({
                     
                     local success, result = pcall(function()
                         local gasTanks = workspace.Unclimbable.Reloads.GasTanks
-                        local offset = Vector3.new(0, 0, 0)
+                        local offset = Vector3.new(2, 2, 2)
                         
                         if gasTanks:IsA("BasePart") then
                             hrp.CFrame = gasTanks.CFrame + offset
