@@ -1,0 +1,727 @@
+repeat task.wait() until game:IsLoaded()
+
+local Library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Subs = Library.subs
+local IsOpen = Subs.Wait
+
+local placeId = game.PlaceId
+
+    local Window = Library:CreateWindow({
+        Name = "HackerLor",
+        Themeable = {
+            Info = "VTrungHackerLor",
+            Credit = false,
+            Background = "",
+            Visible = true
+        }
+    })
+
+	--// Main Tab \\--
+	local MainTab = Window:CreateTab({Name = "Main"})
+	local MainSection = MainTab:CreateSection({Name = "Farming"})
+	local Settings = MainTab:CreateSection({Name = "Settings"})
+	local KA = MainTab:CreateSection({Name = "Kill Aura", Side = "Left"})
+	local AutoMission = MainTab:CreateSection({Name = "Auto", Side = "Right"})
+	local Ect = MainTab:CreateSection({Name = "Ect", Side = "Left"})
+	local Calamity = MainTab:CreateSection({Name = "Calamity", Side = "Right"})
+	local DailySection = MainTab:CreateSection({Name = "Spin", Side = "Left"})
+	local Teleports = MainTab:CreateSection({Name = "Teleports", Side = "Right"})
+
+
+	--// Misc Tab \\--
+	local MiscTab = Window:CreateTab({Name = "Misc"})
+	local MiscSection = MiscTab:CreateSection({Name = "Misc"})
+	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump[P]", Side = "Right"})
+
+
+local Noclip = nil
+local Clip = nil
+
+function noclip()
+    Clip = false
+    local function Nocl()
+        if Clip == false and game.Players.LocalPlayer.Character ~= nil then
+            for _,v in pairs(game.Players.LocalPlayer.Character:GetDescendants()) do
+                if v:IsA('BasePart') and v.CanCollide and v.Name ~= floatName then
+                    v.CanCollide = false
+                end
+            end
+        end
+        wait(0.21) 
+    end
+    Noclip = game:GetService('RunService').Stepped:Connect(Nocl)
+end
+
+function clip()
+    if Noclip then Noclip:Disconnect() end
+    Clip = true
+end
+
+Ect:AddToggle({
+    Name = "Noclip",
+    Default = false,
+    Callback = function(value)
+        if value then
+            noclip()
+        else
+            clip()
+        end
+    end
+})
+
+	--// NoClip \\--
+	local antifallActive = false 
+	spawn(function()
+		game:GetService("RunService").Stepped:Connect(function()
+			if getgenv().Farm or getgenv().MoveAround or getgenv().AutoCollect or getgenv().AutoMoveEnabled then
+				for _, v in pairs(game:GetService("Players").LocalPlayer.Character:GetDescendants()) do
+					if v:IsA("BasePart") then
+						v.CanCollide = false    
+					end
+					if v:IsA("Humanoid") then
+						v:ChangeState(11)
+					end
+				end
+				if not antifallActive then  -- Check if no clip is already active
+					antifallActive = true
+					EnableAntiFall()
+				end
+			else
+				if antifallActive then
+					antifallActive = false
+					DisableAntiFall()
+				end
+			end
+		end)
+	end)
+
+
+KA:AddToggle({
+    Name = "Auto Attack Titan",
+    Default = false,
+    Callback = function(Value)
+        getgenv().FloatAboveTitan = Value
+        
+        if Value then
+            -- Khởi động script khi bật toggle
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                local workspace = game:GetService("Workspace")
+                local player = Players.LocalPlayer
+
+                local function getCharacterAndHRP()
+                    local character = player.Character
+                    if not character then return nil, nil end
+                    local hrp = character:FindFirstChild("HumanoidRootPart")
+                    return character, hrp
+                end
+
+                local function getTitanNape(titan)
+                    if not titan then return nil end
+                    local hitboxes = titan:FindFirstChild("Hitboxes")
+                    if not hitboxes then return nil end
+                    local hit = hitboxes:FindFirstChild("Hit")
+                    if not hit then return nil end
+                    local nape = hit:FindFirstChild("Nape")
+                    return nape
+                end
+
+                local function isTitanAlive(titan)
+                    if not titan or not titan:IsDescendantOf(workspace) then
+                        return false
+                    end
+                    local humanoid = titan:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        return true
+                    end
+                    return false
+                end
+
+                local function getNextTitan()
+                    local titans = workspace:FindFirstChild("Titans")
+                    if not titans then return nil end
+                    
+                    for _, titan in ipairs(titans:GetChildren()) do
+                        if isTitanAlive(titan) then
+                            local nape = getTitanNape(titan)
+                            if nape then
+                                return titan
+                            end
+                        end
+                    end
+                    
+                    return nil
+                end
+
+                local function setupBodyPosition(hrp)
+                    local bp = hrp:FindFirstChild("FloatBodyPosition")
+                    if not bp then
+                        bp = Instance.new("BodyPosition")
+                        bp.Name = "FloatBodyPosition"
+                        bp.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+                        bp.P = 5e4
+                        bp.D = 1000
+                        bp.Parent = hrp
+                    end
+                    return bp
+                end
+
+                local function removeBodyPosition(hrp)
+                    local bp = hrp:FindFirstChild("FloatBodyPosition")
+                    if bp then bp:Destroy() end
+                end
+
+                local function clickMouse()
+                    task.wait(0.02)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                    task.wait(0.05)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                end
+
+                local function attackTitan(titan, hrp, bp)
+                    if not isTitanAlive(titan) then
+                        return false
+                    end
+                    
+                    local titanNape = getTitanNape(titan)
+                    if not titanNape then return false end
+                    
+                    -- Phase 1: Float above titan and follow it
+                    local startTime = tick()
+                    while tick() - startTime < 1 and getgenv().FloatAboveTitan do
+                        if not isTitanAlive(titan) then
+                            return false
+                        end
+                        titanNape = getTitanNape(titan)
+                        if titanNape then
+                            local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                            bp.Position = highPosition
+                        end
+                        task.wait(0.05)
+                    end
+                    
+                    if not getgenv().FloatAboveTitan then return false end
+                    if not isTitanAlive(titan) then return false end
+                    
+                    -- Phase 2: Descend to attack position while following nape
+                    titanNape = getTitanNape(titan)
+                    if titanNape then
+                        local steps = 10
+                        local delay = 0.1 / steps
+                        
+                        for i = 1, steps do
+                            if not getgenv().FloatAboveTitan then return false end
+                            if not isTitanAlive(titan) then return false end
+                            
+                            titanNape = getTitanNape(titan)
+                            if titanNape then
+                                local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                                local targetPosition = titanNape.Position + Vector3.new(10, -5, -5)
+                                local progress = i / steps
+                                local currentPos = highPosition:Lerp(targetPosition, progress)
+                                bp.Position = currentPos
+                            end
+                            clickMouse()
+                            task.wait(delay)
+                        end
+                    end
+                    
+                    if not getgenv().FloatAboveTitan then return false end
+                    if not isTitanAlive(titan) then return false end
+                    
+                    -- Phase 3: Hold position at nape while following movement
+                    local holdStartTime = tick()
+                    while tick() - holdStartTime < 0.3 and getgenv().FloatAboveTitan do
+                        if not isTitanAlive(titan) then
+                            return false
+                        end
+                        
+                        titanNape = getTitanNape(titan)
+                        if titanNape then
+                            bp.Position = titanNape.Position + Vector3.new(10, -5, -5)
+                        end
+                        task.wait(0.03)
+                    end
+                    
+                    if not getgenv().FloatAboveTitan then return false end
+                    
+                    -- Phase 4: Return to high position while following
+                    if isTitanAlive(titan) then
+                        local returnSteps = 5
+                        local returnDelay = 0.1 / returnSteps
+                        
+                        for i = 1, returnSteps do
+                            if not getgenv().FloatAboveTitan then return false end
+                            if not isTitanAlive(titan) then return false end
+                            
+                            titanNape = getTitanNape(titan)
+                            if titanNape then
+                                local attackPosition = titanNape.Position + Vector3.new(10, -5, -5)
+                                local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                                local progress = i / returnSteps
+                                local currentPos = attackPosition:Lerp(highPosition, progress)
+                                bp.Position = currentPos
+                            end
+                            task.wait(returnDelay)
+                        end
+                    end
+                    
+                    return true
+                end
+
+                -- Main loop
+                while getgenv().FloatAboveTitan do
+                    local character, hrp = getCharacterAndHRP()
+                    
+                    if hrp then
+                        local bp = setupBodyPosition(hrp)
+                        local currentTitan = getNextTitan()
+                        
+                        if currentTitan then
+                            local success = attackTitan(currentTitan, hrp, bp)
+                            
+                            if not success then
+                                task.wait(0.5)
+                            end
+                        else
+                            break
+                        end
+                    else
+                        task.wait(1)
+                    end
+                    
+                    task.wait(0.1)
+                end
+                
+                -- Cleanup khi tắt
+                local character, hrp = getCharacterAndHRP()
+                if hrp then
+                    removeBodyPosition(hrp)
+                end
+            end)
+        else
+            -- Khi tắt toggle, cleanup BodyPosition
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                local player = Players.LocalPlayer
+                local character = player.Character
+                if character then
+                    local hrp = character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local bp = hrp:FindFirstChild("FloatBodyPosition")
+                        if bp then bp:Destroy() end
+                    end
+                end
+            end)
+        end
+    end
+})
+
+KA:AddToggle({
+    Name = "Auto Replace Blade",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoReplaceBlade = Value
+        
+        if Value then
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                local player = Players.LocalPlayer
+
+                local function getBladeDurability()
+                    local success, result = pcall(function()
+                        local gui = player.PlayerGui:FindFirstChild("Interface")
+                        if not gui then return nil end
+                        
+                        local hud = gui:FindFirstChild("HUD")
+                        if not hud then return nil end
+                        
+                        local main = hud:FindFirstChild("Main")
+                        if not main then return nil end
+                        
+                        local top = main:FindFirstChild("Top")
+                        if not top then return nil end
+                        
+                        local blades = top:FindFirstChild("Blades")
+                        if not blades then return nil end
+                        
+                        local inner = blades:FindFirstChild("Inner")
+                        if not inner then return nil end
+                        
+                        local bar = inner:FindFirstChild("Bar")
+                        if not bar then return nil end
+                        
+                        local gradient = bar:FindFirstChild("Gradient")
+                        if not gradient then return nil end
+                        
+                        return gradient.Offset.X
+                    end)
+                    
+                    if success and result ~= nil then
+                        return result
+                    else
+                        return nil
+                    end
+                end
+
+                local function pressR()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+                end
+
+                while getgenv().AutoReplaceBlade do
+                    local durability = getBladeDurability()
+                    
+                    if durability ~= nil then
+                        if durability <= -0.14 then
+                            pressR()
+                            task.wait(0.5)
+                        end
+                    end
+                    
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+KA:AddToggle({
+    Name = "Auto ReFill",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoReloadBlades = Value
+        
+        if Value then
+            task.spawn(function()
+                local Players = game:GetService("Players")
+                local VirtualInputManager = game:GetService("VirtualInputManager")
+                local workspace = game:GetService("Workspace")
+                local player = Players.LocalPlayer
+
+                local function getBladesSetsText()
+                    local success, result = pcall(function()
+                        local gui = player.PlayerGui:FindFirstChild("Interface")
+                        if not gui then return nil end
+                        
+                        local hud = gui:FindFirstChild("HUD")
+                        if not hud then return nil end
+                        
+                        local main = hud:FindFirstChild("Main")
+                        if not main then return nil end
+                        
+                        local top = main:FindFirstChild("Top")
+                        if not top then return nil end
+                        
+                        local blades = top:FindFirstChild("Blades")
+                        if not blades then return nil end
+                        
+                        local sets = blades:FindFirstChild("Sets")
+                        if not sets then return nil end
+                        
+                        return sets.Text
+                    end)
+                    
+                    if success and result ~= nil then
+                        return result
+                    else
+                        return nil
+                    end
+                end
+
+                local function teleportToGasTanks()
+                    local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if not hrp then 
+                        return false 
+                    end
+                    
+                    local success, result = pcall(function()
+                        local gasTanks = workspace.Unclimbable.Reloads.GasTanks
+                        
+                        local offset = Vector3.new(0, 0, 0)
+                        
+                        if gasTanks:IsA("BasePart") then
+                            hrp.CFrame = gasTanks.CFrame + offset
+                            return true
+                            
+                        elseif gasTanks:IsA("Model") then
+                            if gasTanks.PrimaryPart then
+                                hrp.CFrame = gasTanks.PrimaryPart.CFrame + offset
+                                return true
+                            else
+                                local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
+                                if part then
+                                    hrp.CFrame = part.CFrame + offset
+                                    return true
+                                end
+                            end
+                        else
+                            local part = gasTanks:FindFirstChildWhichIsA("BasePart", true)
+                            if part then
+                                hrp.CFrame = part.CFrame + offset
+                                return true
+                            end
+                        end
+                        
+                        return false
+                    end)
+                    
+                    if not success then
+                        return false
+                    end
+                    
+                    return result
+                end
+
+                local function pressR()
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+                end
+
+                local function reloadBlades()
+
+                    local teleportSuccess = teleportToGasTanks()
+                    
+                    if teleportSuccess then
+                        task.wait(0.5)
+                        
+                        -- Nhấn R để reload
+                        pressR()
+                        
+                        return true
+                    end
+                    
+                    return false
+                end
+
+                -- Main monitoring loop
+                while getgenv().AutoReloadBlades do
+                    local setsText = getBladesSetsText()
+                    
+                    if setsText then
+
+                        if setsText == "0/3" then
+                            local success = reloadBlades()
+                            
+                            if success then
+                                task.wait(3)
+                            else
+                                task.wait(1)
+                            end
+                        end
+                    end
+                    
+                    task.wait(1)
+                end
+            end)
+        end
+    end
+})
+
+
+getgenv().AutoReplay = false
+local player = game.Players.LocalPlayer
+
+local function HasDrops()
+    local dropsFolder = workspace:FindFirstChild("Objects") and workspace.Objects:FindFirstChild("Drops")
+    if not dropsFolder then return false end
+    return #dropsFolder:GetChildren() > 0
+end
+
+local function GetHealth()
+    if not player.Character then return 100 end
+    local humanoid = player.Character:FindFirstChildWhichIsA("Humanoid")
+    return humanoid and humanoid.Health or 100
+end
+
+function StartAutoReplay()
+    task.spawn(function()
+        while getgenv().AutoReplay do
+            local replicatedStorage = game:GetService("ReplicatedStorage")
+            local playerGui = player:WaitForChild("PlayerGui")
+
+            local invResults = playerGui:FindFirstChild("InvestigationResults")
+            if invResults then invResults:Destroy() end
+
+            local CalaResults = playerGui:FindFirstChild("CalamityResults")
+            if CalaResults then CalaResults:Destroy() end
+
+            local readyReplay = replicatedStorage:FindFirstChild("ReadyReplay")
+            local dropsExist = HasDrops()
+            local health = GetHealth()
+
+
+            local remote = replicatedStorage
+                :WaitForChild("Remotes")
+                :WaitForChild("Server")
+                :WaitForChild("Misc")
+                :WaitForChild("ReadyReplay")
+
+            if readyReplay and readyReplay.Value == 0 then
+                task.wait(4)
+                local dropsExistAfterDelay = HasDrops()
+
+
+                if not dropsExistAfterDelay then
+                    remote:FireServer()
+                end
+            end
+
+            if dropsExist and health <= 0 then
+                remote:FireServer()
+            end
+
+            task.wait(1)
+        end
+    end)
+end
+
+AutoMission:AddToggle({
+    Name = "Auto Replay",
+    Default = false,
+    Callback = function(State)
+        getgenv().AutoReplay = State
+        if State then
+            StartAutoReplay()
+        end
+    end,
+})
+
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local plr = Players.LocalPlayer
+local Character = plr.Character or plr.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+-- Giá trị mặc định
+local WalkSpeed = 150
+local JumpPower = 100
+local isEnabled = false
+
+-- Các connection để có thể disconnect
+local walkSpeedConnection
+local jumpPowerConnection
+
+-- Hàm cập nhật Humanoid mới khi respawn
+local function updateHumanoid(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    
+    -- Disconnect các connection cũ nếu có
+    if walkSpeedConnection then walkSpeedConnection:Disconnect() end
+    if jumpPowerConnection then jumpPowerConnection:Disconnect() end
+    
+    -- Áp dụng giá trị nếu đang bật
+    if isEnabled then
+        Humanoid.WalkSpeed = WalkSpeed
+        Humanoid.JumpPower = JumpPower
+        
+        -- Theo dõi khi WalkSpeed hoặc JumpPower bị reset
+        walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if Humanoid.WalkSpeed ~= WalkSpeed then
+                Humanoid.WalkSpeed = WalkSpeed
+            end
+        end)
+        
+        jumpPowerConnection = Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if Humanoid.JumpPower ~= JumpPower then
+                Humanoid.JumpPower = JumpPower
+            end
+        end)
+    end
+end
+
+plr.CharacterAdded:Connect(updateHumanoid)
+updateHumanoid(Character)
+
+-- Xử lý phím P để bật/tắt
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.P then
+        isEnabled = not isEnabled
+        
+        if Humanoid then
+            if isEnabled then
+                -- Bật: áp dụng speed và jump tùy chỉnh
+                Humanoid.WalkSpeed = WalkSpeed
+                Humanoid.JumpPower = JumpPower
+                
+                -- Theo dõi khi bị reset
+                walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                    if Humanoid.WalkSpeed ~= WalkSpeed then
+                        Humanoid.WalkSpeed = WalkSpeed
+                    end
+                end)
+                
+                jumpPowerConnection = Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+                    if Humanoid.JumpPower ~= JumpPower then
+                        Humanoid.JumpPower = JumpPower
+                    end
+                end)
+            else
+                -- Tắt: ngắt kết nối, để hệ thống tự áp dụng giá trị mặc định
+                if walkSpeedConnection then walkSpeedConnection:Disconnect() end
+                if jumpPowerConnection then jumpPowerConnection:Disconnect() end
+
+            end
+        end
+    end
+end)
+
+SpeedAndJump:AddSlider({
+    Name = "WalkSpeed",
+    Value = WalkSpeed,
+    Min = 16,
+    Max = 300,
+    Flag = "WalkSpeed",
+    Textbox = true,
+    Callback = function(state)
+        WalkSpeed = state
+        if Humanoid and isEnabled then
+            Humanoid.WalkSpeed = WalkSpeed
+        end
+    end
+})
+
+SpeedAndJump:AddSlider({
+    Name = "JumpPower",
+    Value = JumpPower,
+    Min = 50,
+    Max = 500,
+    Flag = "JumpPower",
+    Textbox = true,
+    Callback = function(state)
+        JumpPower = state
+        if Humanoid and isEnabled then
+            Humanoid.JumpPower = JumpPower
+        end
+    end
+})
+
+
+local VirtualUser = game:GetService("VirtualUser")
+	local Players = game:GetService("Players")
+
+
+
+	local function naturalWaitTime()
+		local baseTime = 600
+		local offset = math.random(-120, 180)
+		return math.max(300, baseTime + offset)
+	end
+
+	spawn(function()
+		while true do
+			wait(naturalWaitTime()) 
+			if Players.LocalPlayer and Players.LocalPlayer.Character then
+				VirtualUser:CaptureController()
+				VirtualUser:ClickButton2(Vector2.new(math.random(100, 1820), math.random(100, 980))) 
+			end
+		end
+	end)
