@@ -95,7 +95,6 @@ Ect:AddToggle({
 		end)
 	end)
 
-
 local AttackLoop = nil
 local AttackLoopRunning = false
 
@@ -264,7 +263,7 @@ local function startAttackLoop()
             -- Phase 2: Descend to attack position while following nape
             titanNape = getTitanNape(titan)
             if titanNape then
-                local steps = 10
+                local steps = 5
                 local delay = 0.1 / steps
                 
                 for i = 1, steps do
@@ -296,9 +295,9 @@ local function startAttackLoop()
             if not getgenv().FloatAboveTitan then return false end
             if not isTitanAlive(titan) then return false end
             
-            -- Phase 3: Hold position at nape while following movement
+
             local holdStartTime = tick()
-            while tick() - holdStartTime < 0.3 and getgenv().FloatAboveTitan do
+            while tick() - holdStartTime < 0.2 and getgenv().FloatAboveTitan do
                 local currentSets = getBladesSetsText()
                 if currentSets then
                     local cleanSets = string.gsub(currentSets, "%s+", "")
@@ -318,9 +317,9 @@ local function startAttackLoop()
             
             if not getgenv().FloatAboveTitan then return false end
             
-            -- Phase 4: Return to high position while following
+
             if isTitanAlive(titan) then
-                local returnSteps = 5
+                local returnSteps = 10
                 local returnDelay = 0.1 / returnSteps
                 
                 for i = 1, returnSteps do
@@ -357,6 +356,11 @@ local function startAttackLoop()
             if currentSets then
                 local cleanSets = string.gsub(currentSets, "%s+", "")
                 if cleanSets == "0/3" then
+                    local character, hrp = getCharacterAndHRP()
+                    if hrp then
+                        removeBodyPosition(hrp)
+                    end
+                    
                     while getgenv().FloatAboveTitan do
                         task.wait(0.5)
                         local checkSets = getBladesSetsText()
@@ -423,8 +427,6 @@ KA:AddToggle({
         end
     end
 })
-
-
 
 
 KA:AddToggle({
