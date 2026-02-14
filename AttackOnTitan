@@ -265,7 +265,7 @@ local function startTestAttackLoop()
                 
                 titanNape = getTitanNape(titan)
                 if titanNape then
-                    local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                    local highPosition = titanNape.Position + Vector3.new(0, 150, 0)
                     bp.Position = highPosition
                     
                     hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
@@ -280,7 +280,7 @@ local function startTestAttackLoop()
             
             titanNape = getTitanNape(titan)
             if titanNape then
-                local steps = 10
+                local steps = 5
                 local delay = 0.1 / steps
                 
                 for i = 1, steps do
@@ -300,7 +300,7 @@ local function startTestAttackLoop()
                     
                     titanNape = getTitanNape(titan)
                     if titanNape then
-                        local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                        local highPosition = titanNape.Position + Vector3.new(0, 150, 0)
                         local targetPosition = titanNape.Position + Vector3.new(15, -10, -5)
                         local progress = i / steps
                         local currentPos = highPosition:Lerp(targetPosition, progress)
@@ -334,7 +334,7 @@ local function startTestAttackLoop()
 
                 titanNape = getTitanNape(titan)
                 if titanNape then
-                    bp.Position = titanNape.Position + Vector3.new(10, -5, -5)
+                    bp.Position = titanNape.Position + Vector3.new(15, -10, -5)
                     
                     hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
                     hrp.Velocity = Vector3.zero
@@ -348,7 +348,7 @@ local function startTestAttackLoop()
             if isTitanAlive(titan) then
                 titanNape = getTitanNape(titan)
                 if titanNape then
-                    local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
+                    local highPosition = titanNape.Position + Vector3.new(0, 150, 0)
                     
                     bp.Position = highPosition
                     hrp.CFrame = CFrame.new(highPosition, titanNape.Position)
