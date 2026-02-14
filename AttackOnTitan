@@ -95,34 +95,43 @@ Ect:AddToggle({
 		end)
 	end)
 
-local AttackLoop = nil
-local AttackLoopRunning = false
-
-local function stopAttackLoop()
-    getgenv().FloatAboveTitan = false
-    if AttackLoop then
-        task.cancel(AttackLoop)
-        AttackLoop = nil
-    end
-    AttackLoopRunning = false
-    
-    local Players = game:GetService("Players")
-    local player = Players.LocalPlayer
-    local character = player.Character
-    if character then
-        local hrp = character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local bp = hrp:FindFirstChild("FloatBodyPosition")
-            if bp then bp:Destroy() end
+KA:AddToggle({
+    Name = "Auto Attack Titan",
+    Default = false,
+    Callback = function(Value)
+        getgenv().TestFloatAboveTitan = Value
+        
+        if not Value then
+            if TestAttackLoop then
+                task.cancel(TestAttackLoop)
+                TestAttackLoop = nil
+            end
+            TestAttackLoopRunning = false
+            
+            local Players = game:GetService("Players")
+            local player = Players.LocalPlayer
+            local character = player.Character
+            if character then
+                local hrp = character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local bp = hrp:FindFirstChild("FloatBodyPosition")
+                    if bp then bp:Destroy() end
+                end
+            end
         end
     end
-end
+})
 
-local function startAttackLoop()
-    if AttackLoopRunning then return end
-    AttackLoopRunning = true
+local TestAttackLoop = nil
+local TestAttackLoopRunning = false
+
+local function startTestAttackLoop()
+    if TestAttackLoopRunning then 
+        return 
+    end
+    TestAttackLoopRunning = true
     
-    AttackLoop = task.spawn(function()
+    TestAttackLoop = task.spawn(function()
         local Players = game:GetService("Players")
         local VirtualInputManager = game:GetService("VirtualInputManager")
         local workspace = game:GetService("Workspace")
@@ -158,9 +167,13 @@ local function startAttackLoop()
         
         local function getNextTitan()
             local titans = workspace:FindFirstChild("Titans")
-            if not titans then return nil end
+            if not titans then 
+                return nil 
+            end
             
+            local titanCount = 0
             for _, titan in ipairs(titans:GetChildren()) do
+                titanCount = titanCount + 1
                 if isTitanAlive(titan) then
                     local nape = getTitanNape(titan)
                     if nape then
@@ -168,7 +181,6 @@ local function startAttackLoop()
                     end
                 end
             end
-            
             return nil
         end
         
@@ -187,7 +199,9 @@ local function startAttackLoop()
         
         local function removeBodyPosition(hrp)
             local bp = hrp:FindFirstChild("FloatBodyPosition")
-            if bp then bp:Destroy() end
+            if bp then 
+                bp:Destroy() 
+            end
         end
         
         local function clickMouse()
@@ -235,9 +249,8 @@ local function startAttackLoop()
             local titanNape = getTitanNape(titan)
             if not titanNape then return false end
             
-            -- Phase 1: Float above titan and follow it
             local startTime = tick()
-            while tick() - startTime < 1 and getgenv().FloatAboveTitan do
+            while tick() - startTime < 1 and getgenv().TestFloatAboveTitan do
                 local currentSets = getBladesSetsText()
                 if currentSets then
                     local cleanSets = string.gsub(currentSets, "%s+", "")
@@ -249,25 +262,29 @@ local function startAttackLoop()
                 if not isTitanAlive(titan) then
                     return false
                 end
+                
                 titanNape = getTitanNape(titan)
                 if titanNape then
                     local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
                     bp.Position = highPosition
+                    
+                    hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
+                    hrp.Velocity = Vector3.zero
+                    hrp.AssemblyLinearVelocity = Vector3.zero
                 end
-                task.wait(0.05)
+                task.wait(0.01)
             end
             
-            if not getgenv().FloatAboveTitan then return false end
+            if not getgenv().TestFloatAboveTitan then return false end
             if not isTitanAlive(titan) then return false end
             
-            -- Phase 2: Descend to attack position while following nape
             titanNape = getTitanNape(titan)
             if titanNape then
-                local steps = 5
+                local steps = 10
                 local delay = 0.1 / steps
                 
                 for i = 1, steps do
-                    if not getgenv().FloatAboveTitan then return false end
+                    if not getgenv().TestFloatAboveTitan then return false end
                     
                     local currentSets = getBladesSetsText()
                     if currentSets then
@@ -277,27 +294,32 @@ local function startAttackLoop()
                         end
                     end
                     
-                    if not isTitanAlive(titan) then return false end
+                    if not isTitanAlive(titan) then
+                        return false
+                    end
                     
                     titanNape = getTitanNape(titan)
                     if titanNape then
                         local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
-                        local targetPosition = titanNape.Position + Vector3.new(10, -5, -5)
+                        local targetPosition = titanNape.Position + Vector3.new(15, -10, -5)
                         local progress = i / steps
                         local currentPos = highPosition:Lerp(targetPosition, progress)
                         bp.Position = currentPos
+                        
+                        hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
+                        hrp.Velocity = Vector3.zero
+                        hrp.AssemblyLinearVelocity = Vector3.zero
                     end
                     clickMouse()
                     task.wait(delay)
                 end
             end
             
-            if not getgenv().FloatAboveTitan then return false end
+            if not getgenv().TestFloatAboveTitan then return false end
             if not isTitanAlive(titan) then return false end
             
-
             local holdStartTime = tick()
-            while tick() - holdStartTime < 0.1 and getgenv().FloatAboveTitan do
+            while tick() - holdStartTime < 0.1 and getgenv().TestFloatAboveTitan do
                 local currentSets = getBladesSetsText()
                 if currentSets then
                     local cleanSets = string.gsub(currentSets, "%s+", "")
@@ -306,52 +328,43 @@ local function startAttackLoop()
                     end
                 end
                 
-                if not isTitanAlive(titan) then return false end
-                
+                if not isTitanAlive(titan) then
+                    return false
+                end
+
                 titanNape = getTitanNape(titan)
                 if titanNape then
                     bp.Position = titanNape.Position + Vector3.new(10, -5, -5)
+                    
+                    hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
+                    hrp.Velocity = Vector3.zero
+                    hrp.AssemblyLinearVelocity = Vector3.zero
                 end
-                task.wait(0.03)
+                task.wait(0.01)
             end
             
-            if not getgenv().FloatAboveTitan then return false end
+            if not getgenv().TestFloatAboveTitan then return false end
             
-
             if isTitanAlive(titan) then
-                local returnSteps = 10
-                local returnDelay = 0.1 / returnSteps
-                
-                for i = 1, returnSteps do
-                    if not getgenv().FloatAboveTitan then return false end
+                titanNape = getTitanNape(titan)
+                if titanNape then
+                    local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
                     
-                    local currentSets = getBladesSetsText()
-                    if currentSets then
-                        local cleanSets = string.gsub(currentSets, "%s+", "")
-                        if cleanSets == "0/3" then
-                            return false
-                        end
-                    end
+                    bp.Position = highPosition
+                    hrp.CFrame = CFrame.new(highPosition, titanNape.Position)
+                    hrp.Velocity = Vector3.zero
+                    hrp.AssemblyLinearVelocity = Vector3.zero
                     
-                    if not isTitanAlive(titan) then return false end
-                    
-                    titanNape = getTitanNape(titan)
-                    if titanNape then
-                        local attackPosition = titanNape.Position + Vector3.new(10, -5, -5)
-                        local highPosition = titanNape.Position + Vector3.new(0, 200, 0)
-                        local progress = i / returnSteps
-                        local currentPos = attackPosition:Lerp(highPosition, progress)
-                        bp.Position = currentPos
-                    end
-                    task.wait(returnDelay)
+                    task.wait(0.1)
                 end
             end
             
             return true
         end
         
-        -- Main loop
-        while getgenv().FloatAboveTitan do
+        local lastTitan = nil
+        
+        while getgenv().TestFloatAboveTitan do
             local currentSets = getBladesSetsText()
             if currentSets then
                 local cleanSets = string.gsub(currentSets, "%s+", "")
@@ -361,7 +374,7 @@ local function startAttackLoop()
                         removeBodyPosition(hrp)
                     end
                     
-                    while getgenv().FloatAboveTitan do
+                    while getgenv().TestFloatAboveTitan do
                         task.wait(0.5)
                         local checkSets = getBladesSetsText()
                         if checkSets then
@@ -374,7 +387,7 @@ local function startAttackLoop()
                 end
             end
             
-            if not getgenv().FloatAboveTitan then
+            if not getgenv().TestFloatAboveTitan then
                 break
             end
             
@@ -385,12 +398,18 @@ local function startAttackLoop()
                 local currentTitan = getNextTitan()
                 
                 if currentTitan then
+                    if lastTitan and lastTitan ~= currentTitan then
+                        task.wait(0.3)
+                    end
+                    
                     local success = attackTitan(currentTitan, hrp, bp)
+                    lastTitan = currentTitan
                     
                     if not success then
                         task.wait(0.5)
                     end
                 else
+                    lastTitan = nil
                     task.wait(1)
                 end
             else
@@ -400,34 +419,23 @@ local function startAttackLoop()
             task.wait(0.1)
         end
         
-        -- Cleanup
         local character, hrp = getCharacterAndHRP()
         if hrp then
             removeBodyPosition(hrp)
         end
         
-        AttackLoopRunning = false
+        TestAttackLoopRunning = false
     end)
 end
 
-
-KA:AddToggle({
-    Name = "Auto Attack Titan",
-    Default = false,
-    Callback = function(Value)
-        getgenv().FloatAboveTitan = Value
-        if Value then
-            task.delay(0.1, function()
-                if not AttackLoopRunning then
-                    startAttackLoop()
-                end
-            end)
-        else
-            stopAttackLoop()
+task.spawn(function()
+    while true do
+        if getgenv().TestFloatAboveTitan and not TestAttackLoopRunning then
+            startTestAttackLoop()
         end
+        task.wait(0.5)
     end
-})
-
+end)
 
 KA:AddToggle({
     Name = "Auto Refill Blades",
