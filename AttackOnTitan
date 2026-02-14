@@ -301,7 +301,7 @@ local function startTestAttackLoop()
                     titanNape = getTitanNape(titan)
                     if titanNape then
                         local highPosition = titanNape.Position + Vector3.new(0, 150, 0)
-                        local targetPosition = titanNape.Position + Vector3.new(15, -10, -5)
+                        local targetPosition = titanNape.Position + Vector3.new(10, -10, -5)
                         local progress = i / steps
                         local currentPos = highPosition:Lerp(targetPosition, progress)
                         bp.Position = currentPos
@@ -334,7 +334,7 @@ local function startTestAttackLoop()
 
                 titanNape = getTitanNape(titan)
                 if titanNape then
-                    bp.Position = titanNape.Position + Vector3.new(15, -10, -5)
+                    bp.Position = titanNape.Position + Vector3.new(10, -10, -5)
                     
                     hrp.CFrame = CFrame.new(hrp.Position, titanNape.Position)
                     hrp.Velocity = Vector3.zero
