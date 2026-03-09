@@ -68,9 +68,9 @@ local function pressKey(keyCode)
 end
 
 local function pressM1()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(589, 234, 0, true, game, 0)
     task.wait(0.5)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(589, 234, 0, false, game, 0)
 end
 
 -- ============================================================
