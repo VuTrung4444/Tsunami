@@ -319,6 +319,116 @@ Auto:AddToggle({
     end
 })
 
+
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
+
+-- ============================================================
+-- BƯỚC 1: Click nút Inventory trên HUD
+-- ============================================================
+local function clickInventory()
+    local success, err = pcall(function()
+        local target = PlayerGui.HUD.Canvas.Buttons.Inventory.Main.TextLabel
+        local pos = target.AbsolutePosition
+        local centerX = math.floor(pos.X * 2)
+        local centerY = math.floor(pos.Y + 50)
+        VirtualInputManager:SendMouseMoveEvent(centerX, centerY, game)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+    end)
+    if not success then warn("[Bước 1] Lỗi: " .. tostring(err)) end
+end
+
+-- ============================================================
+-- BƯỚC 2: Click tab Fish trong Inventory
+-- ============================================================
+local function clickFishTab()
+    local success, err = pcall(function()
+        local target = PlayerGui.Inventory.Canvas.Main.Buttons.Fish.TextLabel
+        local pos = target.AbsolutePosition
+        local size = target.AbsoluteSize
+        local centerX = math.floor(pos.X + size.X / 2)
+        local centerY = math.floor(pos.Y + size.Y * 2.1)
+        VirtualInputManager:SendMouseMoveEvent(centerX, centerY, game)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
+        task.wait(0.1)
+        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
+    end)
+    if not success then warn("[Bước 2] Lỗi: " .. tostring(err)) end
+end
+
+-- ============================================================
+-- BƯỚC 3: Quét và click toàn bộ Fish_1, Fish_2, ... trong ThingFrame
+-- ============================================================
+local function clickAllFish()
+    local thingFrame = PlayerGui.Inventory.Canvas.Main.ThingFrame
+    local index = 1
+
+    while true do
+        local fishKey = "Fish_" .. index
+        local fishObj = thingFrame:FindFirstChild(fishKey)
+
+        if not fishObj then break end
+
+        local success, err = pcall(function()
+            local fishName = fishObj.Main.FishName
+            local weight   = fishObj.Main.Weight
+            local clickX = math.floor(fishName.AbsolutePosition.X)
+            local clickY = math.floor(fishName.AbsolutePosition.Y + weight.AbsolutePosition.Y / 2)
+            VirtualInputManager:SendMouseMoveEvent(clickX, clickY, game)
+            task.wait(0.05)
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+            task.wait(0.1)
+            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+        end)
+
+        if not success then warn("[Bước 3] Lỗi Fish_" .. index .. ": " .. tostring(err)) end
+
+        task.wait(0.5)
+        index = index + 1
+    end
+end
+
+-- ============================================================
+-- TOGGLE
+-- ============================================================
+
+local running = false
+
+Auto:AddToggle({
+    Name = "Auto Equip Fish",
+    Default = false,
+    Callback = function(state)
+        running = state
+
+        if not running then return end
+
+        task.spawn(function()
+            while running do
+                clickInventory()
+                task.wait(0.5)
+
+                clickFishTab()
+                task.wait(0.5)
+
+                clickAllFish()
+
+                -- Chờ 2 phút trước khi lặp lại
+                local waited = 0
+                while running and waited < 120 do
+                    task.wait(1)
+                    waited = waited + 1
+                end
+            end
+        end)
+    end
+})
+
 Ect:AddToggle({
     Name = "Noclip",
     Default = false,
