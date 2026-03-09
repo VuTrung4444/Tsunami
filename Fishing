@@ -37,6 +37,29 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
+-- ============================================================
+-- TEXTBOX CONFIG
+-- ============================================================
+local priorityStr = ""  -- Ví dụ: "XCV"
+local comboStr    = ""  -- Ví dụ: "VZ" (đúng 2 ký tự)
+
+-- ============================================================
+-- KEY HELPERS
+-- ============================================================
+
+local keyCodeMap = {
+    Z = Enum.KeyCode.Z,
+    X = Enum.KeyCode.X,
+    C = Enum.KeyCode.C,
+    V = Enum.KeyCode.V,
+}
+
+local skillPathMap = {
+    Z = "Skill1",
+    X = "Skill2",
+    C = "Skill3",
+    V = "Skill4",
+}
 
 local function pressKey(keyCode)
     VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
@@ -50,14 +73,40 @@ local function pressM1()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 end
 
-local function isKeyText(text)
-    return text == "Z" or text == "X" or text == "C" or text == "V"
+-- ============================================================
+-- SKILL STATE
+-- ============================================================
+
+-- Trả về true nếu skill sẵn sàng (Inside.Text == chữ cái)
+local function isSkillReady(keyChar)
+    local path = skillPathMap[keyChar]
+    if not path then return false end
+    local success, text = pcall(function()
+        return PlayerGui.RodGUI.Skills[path].Inside.Text
+    end)
+    return success and text == keyChar
+end
+
+-- Trả về số giây cooldown còn lại (0 nếu sẵn sàng hoặc không đọc được)
+local function getSkillCooldown(keyChar)
+    local path = skillPathMap[keyChar]
+    if not path then return 0 end
+    local success, text = pcall(function()
+        return PlayerGui.RodGUI.Skills[path].Inside.Text
+    end)
+    if not success then return 0 end
+    -- Sẵn sàng
+    if text == keyChar then return 0 end
+    -- Dạng "10s" → 10
+    local seconds = text:match("^(%d+)s$")
+    if seconds then return tonumber(seconds) end
+    return 999  -- không xác định được → coi như cooldown dài
 end
 
 local function isFishingComplete()
     local success, result = pcall(function()
         local healthText = PlayerGui.FishStats.HealthFrame.HealthText.Text
-        local currentHP, maxHP = healthText:match("^(%d+)/(%d+)$")
+        local currentHP = healthText:match("^(%d+)/%d+$")
         if currentHP and tonumber(currentHP) == 0 then
             return true
         end
@@ -75,30 +124,104 @@ local function isFishingComplete()
 end
 
 -- ============================================================
--- SKILL MANAGER
--- Map: Skill1=Z, Skill2=X, Skill3=C, Skill4=V
+-- COMBO STATE
+-- comboPhase:
+--   0 = chưa bắt đầu combo (gọi phím 1 khi điều kiện thỏa)
+--   1 = đã gọi phím 1, đang chờ gọi phím 2
 -- ============================================================
 
-local skillMap = {
-    { path = "Skill1", key = Enum.KeyCode.Z },
-    { path = "Skill2", key = Enum.KeyCode.X },
-    { path = "Skill3", key = Enum.KeyCode.C },
-    { path = "Skill4", key = Enum.KeyCode.V },
-}
+local comboPhase = 0
 
-local function getSkillInsideText(skillPath)
-    local success, text = pcall(function()
-        return PlayerGui.RodGUI.Skills[skillPath].Inside.Text
-    end)
-    if success then return text end
-    return nil
+local function resetCombo()
+    comboPhase = 0
 end
 
-local function pressAvailableSkill()
-    for _, skill in ipairs(skillMap) do
-        local text = getSkillInsideText(skill.path)
-        if text and isKeyText(text) then
-            pressKey(skill.key)
+-- ============================================================
+-- PRESS LOGIC
+-- ============================================================
+
+--[[
+    Combo key1+key2 (ví dụ "VZ"):
+    - Hai phím này bị "giữ lại", không gọi đơn lẻ ngoài combo
+    - comboPhase == 0:
+        Điều kiện kích hoạt combo:
+          a) key1 sẵn sàng VÀ key2 sẵn sàng → gọi key1 ngay
+          b) key1 sẵn sàng VÀ cooldown(key2) <= 4s → gọi key1 ngay,
+             key2 sẽ hết cooldown trước/khi key1 xong
+        Nếu không thỏa → bỏ qua combo, gọi phím khác (không phải key1, key2)
+    - comboPhase == 1 (đã gọi key1):
+        Chờ key2 sẵn sàng rồi gọi ngay, bỏ qua phím khác trong lúc này
+        (key2 phải sẵn sàng sớm vì ta đã kiểm tra cooldown <= 4s trước đó)
+]]
+
+local function pressNextSkill()
+    local comboKey1 = comboStr ~= "" and comboStr:sub(1,1):upper() or nil
+    local comboKey2 = comboStr ~= "" and #comboStr >= 2 and comboStr:sub(2,2):upper() or nil
+    local hasCombo  = comboKey1 ~= nil and comboKey2 ~= nil
+
+    -- ---------- XỬ LÝ COMBO PHASE 1: chờ gọi key2 ----------
+    if hasCombo and comboPhase == 1 then
+        if isSkillReady(comboKey2) then
+            pressKey(keyCodeMap[comboKey2])
+            comboPhase = 0  -- combo hoàn thành
+            return true
+        end
+        -- key2 chưa sẵn sàng → chờ, không gọi gì khác
+        return false
+    end
+
+    -- ---------- XỬ LÝ COMBO PHASE 0: xét có nên kích hoạt combo không ----------
+    local comboBlocked = {}  -- tập phím bị giữ lại (không gọi đơn)
+    local shouldTriggerCombo = false
+
+    if hasCombo then
+        comboBlocked[comboKey1] = true
+        comboBlocked[comboKey2] = true
+
+        local cd1 = getSkillCooldown(comboKey1)
+        local cd2 = getSkillCooldown(comboKey2)
+
+        -- Điều kiện kích hoạt: key1 sẵn sàng VÀ key2 còn <= 4s (hoặc sẵn sàng)
+        if cd1 == 0 and cd2 <= 4 then
+            shouldTriggerCombo = true
+        end
+    end
+
+    if shouldTriggerCombo then
+        pressKey(keyCodeMap[comboKey1])
+        comboPhase = 1
+        return true
+    end
+
+    -- ---------- GỌI PHÍM THƯỜNG (bỏ qua phím combo) ----------
+
+    -- Hàm kiểm tra phím có bị giữ lại không
+    local function isBlocked(k)
+        return comboBlocked[k] == true
+    end
+
+    -- Theo ưu tiên
+    if priorityStr ~= "" then
+        for i = 1, #priorityStr do
+            local keyChar = priorityStr:sub(i,i):upper()
+            if not isBlocked(keyChar) and isSkillReady(keyChar) then
+                pressKey(keyCodeMap[keyChar])
+                return true
+            end
+        end
+        -- Fallback Z (nếu Z không bị block)
+        if not isBlocked("Z") and isSkillReady("Z") then
+            pressKey(Enum.KeyCode.Z)
+            return true
+        end
+        return false
+    end
+
+    -- Mặc định Z → X → C → V
+    local defaultOrder = {"Z", "X", "C", "V"}
+    for _, keyChar in ipairs(defaultOrder) do
+        if not isBlocked(keyChar) and isSkillReady(keyChar) then
+            pressKey(keyCodeMap[keyChar])
             return true
         end
     end
@@ -106,10 +229,27 @@ local function pressAvailableSkill()
 end
 
 -- ============================================================
--- TOGGLE
+-- TOGGLE + TEXTBOX
 -- ============================================================
 
 local running = false
+
+Auto:AddTextbox({
+    Name = "Ưu tiên",
+    Default = "",
+    Callback = function(value)
+        priorityStr = value:gsub("%s+", "")
+    end
+})
+
+Auto:AddTextbox({
+    Name = "Combo",
+    Default = "",
+    Callback = function(value)
+        comboStr = value:gsub("%s+", "")
+        resetCombo()
+    end
+})
 
 Auto:AddToggle({
     Name = "Auto Fishing",
@@ -117,7 +257,10 @@ Auto:AddToggle({
     Callback = function(state)
         running = state
 
-        if not running then return end
+        if not running then
+            resetCombo()
+            return
+        end
 
         task.spawn(function()
             while running do
@@ -142,7 +285,7 @@ Auto:AddToggle({
                         break
                     end
 
-                    if tick() - waitStart >= 2 then
+                    if tick() - waitStart >= 1 then
                         break
                     end
 
@@ -150,6 +293,7 @@ Auto:AddToggle({
                 end
 
                 if fishBiting then
+                    resetCombo()
                     local lastSkillTime = 0
 
                     while running do
@@ -161,8 +305,10 @@ Auto:AddToggle({
                         end
 
                         if now - lastSkillTime >= 0.5 then
-                            lastSkillTime = now
-                            pressAvailableSkill()
+                            local pressed = pressNextSkill()
+                            if pressed then
+                                lastSkillTime = now
+                            end
                         end
 
                         task.wait(0.05)
@@ -172,8 +318,6 @@ Auto:AddToggle({
         end)
     end
 })
-
-
 
 Ect:AddToggle({
     Name = "Noclip",
