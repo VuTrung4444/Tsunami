@@ -63,13 +63,13 @@ local skillPathMap = {
 
 local function pressKey(keyCode)
     VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-    task.wait(0.5)
+    task.wait(0.3)
     VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
 end
 
 local function pressM1()
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-    task.wait(0.1)
+    task.wait(0.5)
     VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
 end
 
