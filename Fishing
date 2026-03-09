@@ -67,9 +67,9 @@ local function pressKey(keyCode)
 end
 
 local function pressM1()
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(620, 300, 0, true, game, 0)
     task.wait(0.1)
-    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+    VirtualInputManager:SendMouseButtonEvent(620, 300, 0, false, game, 0)
 end
 
 -- ============================================================
@@ -367,6 +367,7 @@ Auto:AddToggle({
         end)
     end
 })
+
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
