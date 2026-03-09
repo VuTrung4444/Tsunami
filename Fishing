@@ -1,0 +1,385 @@
+repeat task.wait() until game:IsLoaded()
+
+local Library = loadstring(game:GetObjects("rbxassetid://7657867786")[1].Source)()
+local Subs = Library.subs
+local IsOpen = Subs.Wait
+
+ local Window = Library:CreateWindow({
+        Name = "HackerLor",
+        Themeable = {
+            Info = "VTrungHackerLor",
+            Credit = false,
+            Background = "",
+            Visible = true
+        }
+    })
+
+	--// Main Tab \\--
+	local MainTab = Window:CreateTab({Name = "Main"})
+	local MainSection = MainTab:CreateSection({Name = "Farming"})
+	local Settings = MainTab:CreateSection({Name = "Settings"})
+	local Auto = MainTab:CreateSection({Name = "Auto", Side = "Left"})
+	local Teleports = MainTab:CreateSection({Name = "Teleports", Side = "Right"})
+
+
+	--// Misc Tab \\--
+	local MiscTab = Window:CreateTab({Name = "Misc"})
+	local MiscSection = MiscTab:CreateSection({Name = "Misc"})
+	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump[P]", Side = "Right"})
+	local Ect = MiscTab:CreateSection({Name = "Ect", Side = "Left"})
+
+
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
+
+
+local function pressKey(keyCode)
+    VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+    task.wait(0.5)
+    VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+end
+
+local function pressM1()
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+end
+
+local function isKeyText(text)
+    return text == "Z" or text == "X" or text == "C" or text == "V"
+end
+
+local function isFishingComplete()
+    local success, result = pcall(function()
+        local healthText = PlayerGui.FishStats.HealthFrame.HealthText.Text
+        local currentHP, maxHP = healthText:match("^(%d+)/(%d+)$")
+        if currentHP and tonumber(currentHP) == 0 then
+            return true
+        end
+
+        local distText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
+        local currentDist, maxDist = distText:match("^(%d+)m/(%d+)m$")
+        if currentDist and maxDist and tonumber(currentDist) > tonumber(maxDist) then
+            return true
+        end
+
+        return false
+    end)
+    if success then return result end
+    return false
+end
+
+-- ============================================================
+-- SKILL MANAGER
+-- Map: Skill1=Z, Skill2=X, Skill3=C, Skill4=V
+-- ============================================================
+
+local skillMap = {
+    { path = "Skill1", key = Enum.KeyCode.Z },
+    { path = "Skill2", key = Enum.KeyCode.X },
+    { path = "Skill3", key = Enum.KeyCode.C },
+    { path = "Skill4", key = Enum.KeyCode.V },
+}
+
+local function getSkillInsideText(skillPath)
+    local success, text = pcall(function()
+        return PlayerGui.RodGUI.Skills[skillPath].Inside.Text
+    end)
+    if success then return text end
+    return nil
+end
+
+local function pressAvailableSkill()
+    for _, skill in ipairs(skillMap) do
+        local text = getSkillInsideText(skill.path)
+        if text and isKeyText(text) then
+            pressKey(skill.key)
+            return true
+        end
+    end
+    return false
+end
+
+-- ============================================================
+-- TOGGLE
+-- ============================================================
+
+local running = false
+
+Auto:AddToggle({
+    Name = "Auto Fishing",
+    Default = false,
+    Callback = function(state)
+        running = state
+
+        if not running then return end
+
+        task.spawn(function()
+            while running do
+                pressM1()
+
+                local prevDistText = ""
+                pcall(function()
+                    prevDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
+                end)
+
+                local fishBiting = false
+                local waitStart = tick()
+
+                while running do
+                    local currentDistText = ""
+                    pcall(function()
+                        currentDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
+                    end)
+
+                    if currentDistText ~= prevDistText then
+                        fishBiting = true
+                        break
+                    end
+
+                    if tick() - waitStart >= 2 then
+                        break
+                    end
+
+                    task.wait(0.05)
+                end
+
+                if fishBiting then
+                    local lastSkillTime = 0
+
+                    while running do
+                        local now = tick()
+
+                        if isFishingComplete() then
+                            task.wait(1)
+                            break
+                        end
+
+                        if now - lastSkillTime >= 0.5 then
+                            lastSkillTime = now
+                            pressAvailableSkill()
+                        end
+
+                        task.wait(0.05)
+                    end
+                end
+            end
+        end)
+    end
+})
+
+
+
+Ect:AddToggle({
+    Name = "Noclip",
+    Default = false,
+    Callback = function(value)
+        if value then
+            noclip()
+        else
+            clip()
+        end
+    end
+})
+
+	--// NoClip \\--
+	local antifallActive = false 
+	spawn(function()
+		game:GetService("RunService").Stepped:Connect(function()
+			if getgenv().Farm or getgenv().MoveAround or getgenv().AutoCollect or getgenv().AutoMoveEnabled then
+				for _, v in pairs(game:GetService("Players").LocalPlayer.Character:GetDescendants()) do
+					if v:IsA("BasePart") then
+						v.CanCollide = false    
+					end
+					if v:IsA("Humanoid") then
+						v:ChangeState(11)
+					end
+				end
+				if not antifallActive then  -- Check if no clip is already active
+					antifallActive = true
+					EnableAntiFall()
+				end
+			else
+				if antifallActive then
+					antifallActive = false
+					DisableAntiFall()
+				end
+			end
+		end)
+	end)
+
+
+local SelectedIsland = nil
+local Islands = {}
+
+local islandNames = {"Island 1", "Island 2", "Island 3", "Island 4", "Island 5"}
+
+for _, name in ipairs(islandNames) do
+	local success, islandPart = pcall(function()
+		return workspace:WaitForChild("SpawnLocation"):WaitForChild(name):WaitForChild("Part")
+	end)
+
+	if success and islandPart then
+		Islands[name] = islandPart
+	end
+end
+
+for islandName, islandPart in pairs(Islands) do
+	Teleports:AddToggle({
+		Name = islandName,
+		Default = false,
+		Callback = function(state)
+			if state then
+				SelectedIsland = islandPart
+
+				for otherName, _ in pairs(Islands) do
+					if otherName ~= islandName then
+						Teleports:UpdateToggle(otherName, false)
+					end
+				end
+			else
+				if SelectedIsland == islandPart then
+					SelectedIsland = nil
+				end
+			end
+		end
+	})
+end
+
+Teleports:AddButton({
+	Name = "Teleport",
+	Callback = function()
+		if SelectedIsland then
+			local player = game:GetService("Players").LocalPlayer
+			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+
+			if hrp and SelectedIsland:IsDescendantOf(workspace) then
+				local offsetY = 10
+				hrp.CFrame = SelectedIsland.CFrame + Vector3.new(0, offsetY, 0)
+				task.wait(1)
+			else
+				warn("Island chưa load hoặc không tồn tại trong workspace!")
+			end
+		else
+			warn("Chưa chọn Island để dịch chuyển!")
+		end
+	end
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local plr = Players.LocalPlayer
+local Character = plr.Character or plr.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+
+
+local WalkSpeed = 50
+local JumpPower = 50
+local isEnabled = false
+
+-- Các connection để có thể disconnect
+local walkSpeedConnection
+local jumpPowerConnection
+
+-- Hàm cập nhật Humanoid mới khi respawn
+local function updateHumanoid(char)
+    Character = char
+    Humanoid = char:WaitForChild("Humanoid")
+    
+    -- Disconnect các connection cũ nếu có
+    if walkSpeedConnection then walkSpeedConnection:Disconnect() end
+    if jumpPowerConnection then jumpPowerConnection:Disconnect() end
+    
+    -- Áp dụng giá trị nếu đang bật
+    if isEnabled then
+        Humanoid.WalkSpeed = WalkSpeed
+        Humanoid.JumpPower = JumpPower
+        
+        -- Theo dõi khi WalkSpeed hoặc JumpPower bị reset
+        walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+            if Humanoid.WalkSpeed ~= WalkSpeed then
+                Humanoid.WalkSpeed = WalkSpeed
+            end
+        end)
+        
+        jumpPowerConnection = Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+            if Humanoid.JumpPower ~= JumpPower then
+                Humanoid.JumpPower = JumpPower
+            end
+        end)
+    end
+end
+
+plr.CharacterAdded:Connect(updateHumanoid)
+updateHumanoid(Character)
+-- Xử lý phím P để bật/tắt
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    
+    if input.KeyCode == Enum.KeyCode.P then
+        isEnabled = not isEnabled
+        
+        if Humanoid then
+            if isEnabled then
+                -- Bật: áp dụng speed và jump tùy chỉnh
+                Humanoid.WalkSpeed = WalkSpeed
+                Humanoid.JumpPower = JumpPower
+                
+                -- Theo dõi khi bị reset
+                walkSpeedConnection = Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                    if Humanoid.WalkSpeed ~= WalkSpeed then
+                        Humanoid.WalkSpeed = WalkSpeed
+                    end
+                end)
+                
+                jumpPowerConnection = Humanoid:GetPropertyChangedSignal("JumpPower"):Connect(function()
+                    if Humanoid.JumpPower ~= JumpPower then
+                        Humanoid.JumpPower = JumpPower
+                    end
+                end)
+            else
+                -- Tắt: ngắt kết nối, để hệ thống tự áp dụng giá trị mặc định
+                if walkSpeedConnection then walkSpeedConnection:Disconnect() end
+                if jumpPowerConnection then jumpPowerConnection:Disconnect() end
+
+            end
+        end
+    end
+end)
+
+-- Khi người dùng thay đổi slider
+SpeedAndJump:AddSlider({
+    Name = "WalkSpeed",
+    Value = WalkSpeed,
+    Min = 16,
+    Max = 80,
+    Flag = "WalkSpeed",
+    Textbox = true,
+    Callback = function(state)
+        WalkSpeed = state
+        if Humanoid and isEnabled then
+            Humanoid.WalkSpeed = WalkSpeed
+        end
+    end
+})
+
+SpeedAndJump:AddSlider({
+    Name = "JumpPower",
+    Value = JumpPower,
+    Min = 50,
+    Max = 80,
+    Flag = "JumpPower",
+    Textbox = true,
+    Callback = function(state)
+        JumpPower = state
+        if Humanoid and isEnabled then
+            Humanoid.JumpPower = JumpPower
+        end
+    end
+})
