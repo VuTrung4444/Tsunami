@@ -429,6 +429,18 @@ Auto:AddToggle({
     end
 })
 
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local PLACE_ID = game.PlaceId
+
+MiscSection:AddButton({
+    Name = "Hop Server",
+    Callback = function()
+        TeleportService:Teleport(PLACE_ID, Players.LocalPlayer)
+    end
+})
+
+
 Ect:AddToggle({
     Name = "Noclip",
     Default = false,
