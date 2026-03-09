@@ -479,6 +479,102 @@ Ect:AddToggle({
 		end)
 	end)
 
+local CHECK_INTERVAL = 1
+local ISLANDS = {"Island 1", "Island 2", "Island 3", "Island 4", "Island 5"}
+
+-- ============================================================
+-- TẠO / XOÁ MARKER
+-- ============================================================
+
+local function createBossMarker(zone, islandName)
+    if zone:FindFirstChild("BossZoneESP") then return end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "BossZoneESP"
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 5, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Adornee = zone
+    billboard.Parent = zone
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Font = Enum.Font.GothamBold
+    label.TextScaled = true
+    label.Text = "⚠ BOSS - " .. islandName
+    label.Parent = billboard
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "BossZoneHighlight"
+    highlight.FillColor = Color3.fromRGB(255, 0, 0)
+    highlight.OutlineColor = Color3.fromRGB(255, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineTransparency = 0
+    highlight.Adornee = zone
+    highlight.Parent = zone
+end
+
+local function removeMarker(zone)
+    for _, obj in pairs(zone:GetChildren()) do
+        if obj.Name == "BossZoneESP" or obj.Name == "BossZoneHighlight" then
+            obj:Destroy()
+        end
+    end
+end
+
+local function removeAllMarkers()
+    for _, islandName in ipairs(ISLANDS) do
+        pcall(function()
+            removeMarker(workspace.BossZones[islandName])
+        end)
+    end
+end
+
+-- ============================================================
+-- SCAN: kiểm tra BossSpawnZone từng island
+-- Có → đánh dấu | Không → xoá đánh dấu
+-- ============================================================
+
+local function scanAll()
+    for _, islandName in ipairs(ISLANDS) do
+        pcall(function()
+            local zone = workspace.BossZones[islandName]
+            if zone:FindFirstChild("BossSpawnZone") then
+                createBossMarker(zone, islandName)
+            else
+                removeMarker(zone)
+            end
+        end)
+    end
+end
+
+-- ============================================================
+-- TOGGLE
+-- ============================================================
+
+Ect:AddToggle({
+    Name = "Boss Zone ESP",
+    Flag = "BossZone_Toggle",
+    Callback = function(state)
+        getgenv().BossZoneEnabled = state
+
+        if state then
+            task.spawn(function()
+                while getgenv().BossZoneEnabled do
+                    scanAll()
+                    task.wait(CHECK_INTERVAL)
+                end
+                removeAllMarkers()
+            end)
+        else
+            removeAllMarkers()
+        end
+    end
+})
 
 local SelectedIsland = nil
 local Islands = {}
