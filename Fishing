@@ -60,10 +60,45 @@ local skillPathMap = {
     V = "Skill4",
 }
 
+-- Tọa độ touch tương ứng với từng skill (chỉ dùng khi FishingButton tồn tại)
+local skillTouchCoords = {
+    Z = {x = 750, y = 135},
+    X = {x = 750, y = 185},
+    C = {x = 750, y = 235},
+    V = {x = 750, y = 280},
+}
+
+-- Kiểm tra 1 lần duy nhất khi script chạy
+local isMobile = PlayerGui:FindFirstChild("RodGUI") ~= nil
+    and PlayerGui.RodGUI:FindFirstChild("FishingButton") ~= nil
+
+local function touchClick(x, y)
+    VirtualInputManager:SendMouseMoveEvent(x, y, game)
+    task.wait(0.05)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+end
+
 local function pressKey(keyCode)
     VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
     task.wait(0.5)
     VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+end
+
+-- Gọi skill theo keyChar: touch nếu mobile, keypress nếu không
+local function pressSkill(keyChar)
+    if isMobile then
+        local coords = skillTouchCoords[keyChar]
+        if coords then
+            touchClick(coords.x, coords.y)
+        end
+    else
+        local kc = keyCodeMap[keyChar]
+        if kc then
+            pressKey(kc)
+        end
+    end
 end
 
 local function pressM1()
@@ -147,7 +182,7 @@ local function pressNextSkill()
     if comboPhase == 1 and cachedKey1 ~= nil and cachedKey2 ~= nil then
         if not isSkillReady(cachedKey1) then
             -- key1 đã bắt đầu cooldown → gọi key2
-            pressKey(keyCodeMap[cachedKey2])
+            pressSkill(cachedKey2)
             resetCombo()
             return true
         end
@@ -174,7 +209,7 @@ local function pressNextSkill()
             cachedKey1 = k1
             cachedKey2 = k2
             comboPhase = 1
-            pressKey(keyCodeMap[k1])
+            pressSkill(k1)
             return true
         end
     end
@@ -189,12 +224,12 @@ local function pressNextSkill()
         for i = 1, #priorityStr do
             local keyChar = priorityStr:sub(i,i):upper()
             if not isBlocked(keyChar) and isSkillReady(keyChar) then
-                pressKey(keyCodeMap[keyChar])
+                pressSkill(keyChar)
                 return true
             end
         end
         if not isBlocked("Z") and isSkillReady("Z") then
-            pressKey(Enum.KeyCode.Z)
+            pressSkill("Z")
             return true
         end
         return false
@@ -203,7 +238,7 @@ local function pressNextSkill()
     local defaultOrder = {"Z", "X", "C", "V"}
     for _, keyChar in ipairs(defaultOrder) do
         if not isBlocked(keyChar) and isSkillReady(keyChar) then
-            pressKey(keyCodeMap[keyChar])
+            pressSkill(keyChar)
             return true
         end
     end
@@ -305,7 +340,7 @@ Auto:AddToggle({
 
                             task.spawn(function()
                                 if comboPhase == 1 and cachedKey2 ~= nil then
-                                    pressKey(keyCodeMap[cachedKey2])
+                                    pressSkill(cachedKey2)
                                     resetCombo()
 
                                 elseif hasCombo then
@@ -315,21 +350,21 @@ Auto:AddToggle({
                                         cachedKey1 = k1
                                         cachedKey2 = k2
                                         comboPhase = 1
-                                        pressKey(keyCodeMap[k1])
+                                        pressSkill(k1)
                                     else
                                         -- combo chưa sẵn sàng → gọi phím thường
                                         if priorityStr ~= "" then
                                             for i = 1, #priorityStr do
                                                 local kc = priorityStr:sub(i,i):upper()
                                                 if not isBlocked(kc) and isSkillReady(kc) then
-                                                    pressKey(keyCodeMap[kc])
+                                                    pressSkill(kc)
                                                     break
                                                 end
                                             end
                                         else
                                             for _, kc in ipairs({"Z","X","C","V"}) do
                                                 if not isBlocked(kc) and isSkillReady(kc) then
-                                                    pressKey(keyCodeMap[kc])
+                                                    pressSkill(kc)
                                                     break
                                                 end
                                             end
@@ -342,14 +377,14 @@ Auto:AddToggle({
                                         for i = 1, #priorityStr do
                                             local kc = priorityStr:sub(i,i):upper()
                                             if isSkillReady(kc) then
-                                                pressKey(keyCodeMap[kc])
+                                                pressSkill(kc)
                                                 break
                                             end
                                         end
                                     else
                                         for _, kc in ipairs({"Z","X","C","V"}) do
                                             if isSkillReady(kc) then
-                                                pressKey(keyCodeMap[kc])
+                                                pressSkill(kc)
                                                 break
                                             end
                                         end
@@ -367,7 +402,6 @@ Auto:AddToggle({
         end)
     end
 })
-
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
