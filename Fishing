@@ -28,7 +28,6 @@ local IsOpen = Subs.Wait
 	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump[P]", Side = "Right"})
 	local Ect = MiscTab:CreateSection({Name = "Ect", Side = "Left"})
 
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -69,8 +68,14 @@ local skillTouchCoords = {
 }
 
 -- Kiểm tra 1 lần duy nhất khi script chạy
-local isMobile = PlayerGui:FindFirstChild("RodGUI") ~= nil
-    and PlayerGui.RodGUI:FindFirstChild("FishingButton") ~= nil
+local function checkIsMobile()
+    local success, pos = pcall(function()
+        return PlayerGui.RodGUI.Skills.AbsolutePosition
+    end)
+    if not success then return false end
+    return math.abs(pos.X - 636.539) <= 0.5 and math.abs(pos.Y - 60.251) <= 0.5
+end
+local isMobile = checkIsMobile()
 
 local function touchClick(x, y)
     VirtualInputManager:SendMouseMoveEvent(x, y, game)
