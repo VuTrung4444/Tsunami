@@ -28,6 +28,7 @@ local IsOpen = Subs.Wait
 	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump[P]", Side = "Right"})
 	local Ect = MiscTab:CreateSection({Name = "Ect", Side = "Left"})
 
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -149,24 +150,15 @@ local function getSkillCooldown(keyChar)
     return 999
 end
 
-local function isFishingComplete()
-    local success, result = pcall(function()
-        local healthText = PlayerGui.FishStats.HealthFrame.HealthText.Text
-        local currentHP = healthText:match("^(%d+)/%d+$")
-        if currentHP and tonumber(currentHP) == 0 then
-            return true
-        end
-
+-- Đọc currentDist từ DistanceFrame, trả về số nguyên hoặc nil
+local function getCurrentDist()
+    local success, cur = pcall(function()
         local distText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-        local currentDist, maxDist = distText:match("^(%d+)m/(%d+)m$")
-        if currentDist and maxDist and tonumber(currentDist) > tonumber(maxDist) then
-            return true
-        end
-
-        return false
+        local c, _ = distText:match("^(%d+)m/(%d+)m$")
+        return c and tonumber(c) or nil
     end)
-    if success then return result end
-    return false
+    if success then return cur end
+    return nil
 end
 
 -- ============================================================
@@ -251,18 +243,47 @@ Auto:AddToggle({
                     resetCombo()
                     local lastSkillTime = 0
                     local skillBusy = false
-                    -- FLAG: cờ báo cá đã thoát, dừng mọi skill ngay lập tức
-                    local fishEscaped = false
 
-                    while running do
+                    -- ── Phát hiện cá thoát bằng cách đếm số tick text không đổi ──
+                    -- Ngoại lệ: bỏ qua nếu currentDist <= 3 (cá sắp chết, text tạm đứng yên)
+                    local STALE_MAX  = 20          -- 20 × 0.05s = 1 giây liên tục không đổi
+                    local staleCount = 0
+                    local lastDistText = ""
+                    pcall(function()
+                        lastDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
+                    end)
+
+                    local fishActive = true        -- true = đang câu, false = cá thoát/hết
+
+                    while running and fishActive do
                         local now = tick()
 
-                        if isFishingComplete() then
-                            fishEscaped = true  -- Bật cờ để task.spawn bên trong không press skill nữa
-                            task.wait(1)
-                            break
+                        -- Đọc text hiện tại
+                        local curDistText = ""
+                        pcall(function()
+                            curDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
+                        end)
+
+                        if curDistText == lastDistText then
+                            -- Text đứng yên — kiểm tra xem có phải gần 0 không
+                            local cur = getCurrentDist()
+                            if cur == nil or cur > 3 then
+                                -- Không phải trường hợp cá sắp chết → đếm stale
+                                staleCount = staleCount + 1
+                                if staleCount >= STALE_MAX then
+                                    fishActive = false
+                                    break
+                                end
+                            else
+                                staleCount = 0  -- gần 0m → reset, không tính là stale
+                            end
+                        else
+                            -- Text thay đổi → cá vẫn đang kéo → reset counter
+                            staleCount   = 0
+                            lastDistText = curDistText
                         end
 
+                        -- ── Gọi chiêu ────────────────────────────────────────────
                         if not skillBusy and now - lastSkillTime >= 0.5 then
                             local k1 = comboStr ~= "" and comboStr:sub(1,1):upper() or nil
                             local k2 = comboStr ~= "" and #comboStr >= 2 and comboStr:sub(2,2):upper() or nil
@@ -280,8 +301,8 @@ Auto:AddToggle({
                             lastSkillTime = now
 
                             task.spawn(function()
-                                -- Kiểm tra cờ trước khi bấm bất kỳ skill nào
-                                if fishEscaped then
+                                -- Guard: nếu cá đã thoát trong lúc chờ spawn thì bỏ qua
+                                if not fishActive then
                                     skillBusy = false
                                     return
                                 end
@@ -301,7 +322,7 @@ Auto:AddToggle({
                                     else
                                         if priorityStr ~= "" then
                                             for i = 1, #priorityStr do
-                                                if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
+                                                if not fishActive then break end
                                                 local kc = priorityStr:sub(i,i):upper()
                                                 if not isBlocked(kc) and isSkillReady(kc) then
                                                     pressSkill(kc)
@@ -310,7 +331,7 @@ Auto:AddToggle({
                                             end
                                         else
                                             for _, kc in ipairs({"Z","X","C","V"}) do
-                                                if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
+                                                if not fishActive then break end
                                                 if not isBlocked(kc) and isSkillReady(kc) then
                                                     pressSkill(kc)
                                                     break
@@ -322,7 +343,7 @@ Auto:AddToggle({
                                 else
                                     if priorityStr ~= "" then
                                         for i = 1, #priorityStr do
-                                            if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
+                                            if not fishActive then break end
                                             local kc = priorityStr:sub(i,i):upper()
                                             if isSkillReady(kc) then
                                                 pressSkill(kc)
@@ -331,7 +352,7 @@ Auto:AddToggle({
                                         end
                                     else
                                         for _, kc in ipairs({"Z","X","C","V"}) do
-                                            if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
+                                            if not fishActive then break end
                                             if isSkillReady(kc) then
                                                 pressSkill(kc)
                                                 break
@@ -346,12 +367,18 @@ Auto:AddToggle({
 
                         task.wait(0.05)
                     end
+
+                    -- Chờ skillBusy kết thúc (tối đa 1s) rồi mới clickM1 lại
+                    local waitBusy = tick()
+                    while skillBusy and tick() - waitBusy < 1 do
+                        task.wait(0.05)
+                    end
+                    -- Vòng ngoài sẽ tự gọi clickM1() ở đầu iteration tiếp theo
                 end
             end
         end)
     end
 })
-
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
