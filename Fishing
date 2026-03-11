@@ -251,11 +251,14 @@ Auto:AddToggle({
                     resetCombo()
                     local lastSkillTime = 0
                     local skillBusy = false
+                    -- FLAG: cờ báo cá đã thoát, dừng mọi skill ngay lập tức
+                    local fishEscaped = false
 
                     while running do
                         local now = tick()
 
                         if isFishingComplete() then
+                            fishEscaped = true  -- Bật cờ để task.spawn bên trong không press skill nữa
                             task.wait(1)
                             break
                         end
@@ -277,6 +280,12 @@ Auto:AddToggle({
                             lastSkillTime = now
 
                             task.spawn(function()
+                                -- Kiểm tra cờ trước khi bấm bất kỳ skill nào
+                                if fishEscaped then
+                                    skillBusy = false
+                                    return
+                                end
+
                                 if comboPhase == 1 and cachedKey2 ~= nil then
                                     pressSkill(cachedKey2)
                                     resetCombo()
@@ -292,6 +301,7 @@ Auto:AddToggle({
                                     else
                                         if priorityStr ~= "" then
                                             for i = 1, #priorityStr do
+                                                if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
                                                 local kc = priorityStr:sub(i,i):upper()
                                                 if not isBlocked(kc) and isSkillReady(kc) then
                                                     pressSkill(kc)
@@ -300,6 +310,7 @@ Auto:AddToggle({
                                             end
                                         else
                                             for _, kc in ipairs({"Z","X","C","V"}) do
+                                                if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
                                                 if not isBlocked(kc) and isSkillReady(kc) then
                                                     pressSkill(kc)
                                                     break
@@ -311,6 +322,7 @@ Auto:AddToggle({
                                 else
                                     if priorityStr ~= "" then
                                         for i = 1, #priorityStr do
+                                            if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
                                             local kc = priorityStr:sub(i,i):upper()
                                             if isSkillReady(kc) then
                                                 pressSkill(kc)
@@ -319,6 +331,7 @@ Auto:AddToggle({
                                         end
                                     else
                                         for _, kc in ipairs({"Z","X","C","V"}) do
+                                            if fishEscaped then break end  -- Thoát giữa chừng nếu cá đã thoát
                                             if isSkillReady(kc) then
                                                 pressSkill(kc)
                                                 break
@@ -338,7 +351,6 @@ Auto:AddToggle({
         end)
     end
 })
-
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
