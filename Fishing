@@ -366,7 +366,7 @@ Auto:AddTextbox({
 
 Auto:AddTextbox({
     Name = "Index Sell",
-    Default = "51",
+    Default = "24",
     Callback = function(value)
         local num = tonumber(value)
         if num then sellIndex = num end
