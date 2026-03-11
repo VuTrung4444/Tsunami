@@ -408,6 +408,32 @@ Auto:AddToggle({
     end
 })
 
+
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+Auto:AddToggle({
+    Name = "Auto Gacha",
+    Default = false,
+    Callback = function(state)
+        if state then
+            task.spawn(function()
+                while Auto:GetToggle("Auto Function 16") do
+                    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[16]
+                    if remoteFunction and remoteFunction:IsA("RemoteFunction") then
+                        pcall(function()
+                            remoteFunction:InvokeServer()
+                        end)
+                    end
+                    task.wait(4)
+                end
+            end)
+        end
+    end
+})
+
+
+
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
