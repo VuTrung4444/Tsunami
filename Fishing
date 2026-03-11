@@ -38,8 +38,8 @@ local PlayerGui = LocalPlayer.PlayerGui
 -- ============================================================
 -- TEXTBOX CONFIG
 -- ============================================================
-local priorityStr = ""  -- Ví dụ: "XCV"
-local comboStr    = ""  -- Ví dụ: "VZ" (đúng 2 ký tự)
+local priorityStr = ""
+local comboStr    = ""
 
 -- ============================================================
 -- KEY HELPERS
@@ -59,7 +59,6 @@ local skillPathMap = {
     V = "Skill4",
 }
 
--- Tọa độ touch tương ứng với từng skill (chỉ dùng khi FishingButton tồn tại)
 local skillTouchCoords = {
     Z = {x = 750, y = 135},
     X = {x = 750, y = 185},
@@ -67,7 +66,6 @@ local skillTouchCoords = {
     V = {x = 750, y = 280},
 }
 
--- Kiểm tra 1 lần duy nhất khi script chạy
 local function checkIsMobile()
     local success, pos = pcall(function()
         return PlayerGui.RodGUI.Skills.AbsolutePosition
@@ -91,7 +89,6 @@ local function pressKey(keyCode)
     VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
 end
 
--- Gọi skill theo keyChar: touch nếu mobile, keypress nếu không
 local function pressSkill(keyChar)
     if isMobile then
         local coords = skillTouchCoords[keyChar]
@@ -110,6 +107,20 @@ local function pressM1()
     VirtualInputManager:SendMouseButtonEvent(620, 300, 0, true, game, 0)
     task.wait(0.1)
     VirtualInputManager:SendMouseButtonEvent(620, 300, 0, false, game, 0)
+end
+
+local function pressM1PC()
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+end
+
+local function clickM1()
+    if isMobile then
+        pressM1()
+    else
+        pressM1PC()
+    end
 end
 
 -- ============================================================
@@ -160,11 +171,6 @@ end
 
 -- ============================================================
 -- COMBO STATE
--- comboPhase:
---   0 = chưa bắt đầu combo
---   1 = đã gọi key1, đang chờ gọi key2
--- cachedKey1/2: lưu lại khi phase chuyển sang 1
---   để tránh đọc lại comboStr mỗi lần gọi hàm
 -- ============================================================
 
 local comboPhase = 0
@@ -175,79 +181,6 @@ local function resetCombo()
     comboPhase = 0
     cachedKey1 = nil
     cachedKey2 = nil
-end
-
--- ============================================================
--- PRESS LOGIC
--- ============================================================
-
-local function pressNextSkill()
-
-    -- ---------- PHASE 1: đã gọi key1, chờ key1 vào cooldown rồi mới gọi key2 ----------
-    if comboPhase == 1 and cachedKey1 ~= nil and cachedKey2 ~= nil then
-        if not isSkillReady(cachedKey1) then
-            -- key1 đã bắt đầu cooldown → gọi key2
-            pressSkill(cachedKey2)
-            resetCombo()
-            return true
-        end
-        -- key1 chưa vào cooldown → block, chờ lần tiếp theo
-        return false
-    end
-
-    -- ---------- PHASE 0: xét kích hoạt combo ----------
-    local k1 = comboStr ~= "" and comboStr:sub(1,1):upper() or nil
-    local k2 = comboStr ~= "" and #comboStr >= 2 and comboStr:sub(2,2):upper() or nil
-    local hasCombo = k1 ~= nil and k2 ~= nil and keyCodeMap[k1] ~= nil and keyCodeMap[k2] ~= nil
-
-    local comboBlocked = {}
-
-    if hasCombo then
-        comboBlocked[k1] = true
-        comboBlocked[k2] = true
-
-        local cd1 = getSkillCooldown(k1)
-        local cd2 = getSkillCooldown(k2)
-
-        if cd1 == 0 and cd2 <= 4 then
-            -- Cache key trước khi pressKey (pressKey có task.wait bên trong)
-            cachedKey1 = k1
-            cachedKey2 = k2
-            comboPhase = 1
-            pressSkill(k1)
-            return true
-        end
-    end
-
-    -- ---------- GỌI PHÍM THƯỜNG (bỏ qua phím combo) ----------
-
-    local function isBlocked(k)
-        return comboBlocked[k] == true
-    end
-
-    if priorityStr ~= "" then
-        for i = 1, #priorityStr do
-            local keyChar = priorityStr:sub(i,i):upper()
-            if not isBlocked(keyChar) and isSkillReady(keyChar) then
-                pressSkill(keyChar)
-                return true
-            end
-        end
-        if not isBlocked("Z") and isSkillReady("Z") then
-            pressSkill("Z")
-            return true
-        end
-        return false
-    end
-
-    local defaultOrder = {"Z", "X", "C", "V"}
-    for _, keyChar in ipairs(defaultOrder) do
-        if not isBlocked(keyChar) and isSkillReady(keyChar) then
-            pressSkill(keyChar)
-            return true
-        end
-    end
-    return false
 end
 
 -- ============================================================
@@ -286,7 +219,7 @@ Auto:AddToggle({
 
         task.spawn(function()
             while running do
-                pressM1()
+                clickM1()
 
                 local prevDistText = ""
                 pcall(function()
@@ -357,7 +290,6 @@ Auto:AddToggle({
                                         comboPhase = 1
                                         pressSkill(k1)
                                     else
-                                        -- combo chưa sẵn sàng → gọi phím thường
                                         if priorityStr ~= "" then
                                             for i = 1, #priorityStr do
                                                 local kc = priorityStr:sub(i,i):upper()
@@ -377,7 +309,6 @@ Auto:AddToggle({
                                     end
 
                                 else
-                                    -- Không có combo → gọi theo ưu tiên/mặc định
                                     if priorityStr ~= "" then
                                         for i = 1, #priorityStr do
                                             local kc = priorityStr:sub(i,i):upper()
@@ -440,6 +371,7 @@ Auto:AddToggle({
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
@@ -447,7 +379,7 @@ local PlayerGui = LocalPlayer.PlayerGui
 -- BƯỚC 1: Click nút Inventory trên HUD
 -- ============================================================
 local function clickInventory()
-    local success, err = pcall(function()
+    pcall(function()
         local target = PlayerGui.HUD.Canvas.Buttons.Inventory.Main.TextLabel
         local pos = target.AbsolutePosition
         local centerX = math.floor(pos.X * 2)
@@ -458,14 +390,13 @@ local function clickInventory()
         task.wait(0.1)
         VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
     end)
-    if not success then warn("[Bước 1] Lỗi: " .. tostring(err)) end
 end
 
 -- ============================================================
 -- BƯỚC 2: Click tab Fish trong Inventory
 -- ============================================================
 local function clickFishTab()
-    local success, err = pcall(function()
+    pcall(function()
         local target = PlayerGui.Inventory.Canvas.Main.Buttons.Fish.TextLabel
         local pos = target.AbsolutePosition
         local size = target.AbsoluteSize
@@ -477,38 +408,46 @@ local function clickFishTab()
         task.wait(0.1)
         VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
     end)
-    if not success then warn("[Bước 2] Lỗi: " .. tostring(err)) end
 end
 
 -- ============================================================
--- BƯỚC 3: Quét và click toàn bộ Fish_1, Fish_2, ... trong ThingFrame
+-- BƯỚC 3: Click Fish_1 đến Fish_4
 -- ============================================================
-local function clickAllFish()
+local function clickFish1To4()
     local thingFrame = PlayerGui.Inventory.Canvas.Main.ThingFrame
-    local index = 1
 
-    while true do
-        local fishKey = "Fish_" .. index
-        local fishObj = thingFrame:FindFirstChild(fishKey)
+    for index = 1, 4 do
+        local fishObj = thingFrame:FindFirstChild("Fish_" .. index)
 
-        if not fishObj then break end
+        if fishObj then
+            pcall(function()
+                local fishName = fishObj.Main.FishName
+                local weight   = fishObj.Main.Weight
+                local clickX = math.floor(fishName.AbsolutePosition.X)
+                local clickY = math.floor(fishName.AbsolutePosition.Y + weight.AbsolutePosition.Y / 2)
+                VirtualInputManager:SendMouseMoveEvent(clickX, clickY, game)
+                task.wait(0.05)
+                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
+                task.wait(0.1)
+                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+            end)
+            task.wait(0.5)
+        end
+    end
+end
 
-        local success, err = pcall(function()
-            local fishName = fishObj.Main.FishName
-            local weight   = fishObj.Main.Weight
-            local clickX = math.floor(fishName.AbsolutePosition.X)
-            local clickY = math.floor(fishName.AbsolutePosition.Y + weight.AbsolutePosition.Y / 2)
-            VirtualInputManager:SendMouseMoveEvent(clickX, clickY, game)
-            task.wait(0.05)
-            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-            task.wait(0.1)
-            VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
+-- ============================================================
+-- Gọi RemoteFunction 51 (4 lần = 4 lần bán)
+-- ============================================================
+local function invokeFunction51()
+    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[51]
+    for i = 1, 4 do
+        pcall(function()
+            if remoteFunction and remoteFunction:IsA("RemoteFunction") then
+                remoteFunction:InvokeServer()
+            end
         end)
-
-        if not success then warn("[Bước 3] Lỗi Fish_" .. index .. ": " .. tostring(err)) end
-
         task.wait(0.5)
-        index = index + 1
     end
 end
 
@@ -519,7 +458,7 @@ end
 local running = false
 
 Auto:AddToggle({
-    Name = "Auto Equip Fish",
+    Name = "Auto Sell Equip Fish",
     Default = false,
     Callback = function(state)
         running = state
@@ -534,11 +473,14 @@ Auto:AddToggle({
                 clickFishTab()
                 task.wait(0.5)
 
-                clickAllFish()
+                clickFish1To4()
+                task.wait(0.5)
 
-                -- Chờ 2 phút trước khi lặp lại
+                invokeFunction51()
+
+                -- Chờ 4 phút trước khi lặp lại
                 local waited = 0
-                while running and waited < 120 do
+                while running and waited < 60 do
                     task.wait(1)
                     waited = waited + 1
                 end
@@ -546,6 +488,8 @@ Auto:AddToggle({
         end)
     end
 })
+
+
 
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
@@ -863,3 +807,31 @@ SpeedAndJump:AddSlider({
         end
     end
 })
+
+--[[ LocalScript: Gọi InvokeServer toàn bộ RemoteFunction trong Functions (giãn cách 1 giây)
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Functions = ReplicatedStorage.Communication.Functions
+
+local children = Functions:GetChildren()
+print("📦 Tổng số Function tìm thấy:", #children)
+
+for i, remoteFunction in ipairs(children) do
+    if remoteFunction:IsA("RemoteFunction") then
+        local success, result = pcall(function()
+            return remoteFunction:InvokeServer()
+        end)
+
+        if success then
+            print(string.format("✅ [%d] '%s' => %s", i, remoteFunction.Name, tostring(result)))
+        else
+            warn(string.format("❌ [%d] '%s' => Lỗi: %s", i, remoteFunction.Name, tostring(result)))
+        end
+    else
+        print(string.format("⏭️ [%d] '%s' => Bỏ qua (loại: %s)", i, remoteFunction.Name, remoteFunction.ClassName))
+    end
+
+    task.wait(1) -- ⏱️ Giãn cách 1 giây giữa mỗi lần gọi
+end
+
+print("🏁 Hoàn tất gọi tất cả Functions.")]]
