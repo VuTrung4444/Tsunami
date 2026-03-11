@@ -227,26 +227,34 @@ Auto:AddToggle({
                 local fishActive    = true
 
                 -- Watchdog: 3 điều kiện kết thúc phiên câu
-                --   1. fishCaught  → HP cá = 0          (câu thành công)
-                --   2. fishEscaped → cur > max           (cá thoát: 52m/50m)
-                --   3. stale       → text không đổi 1.2s (không đang câu)
-                local STALE_SEC     = 1.2
-                local watchText     = readDistText() or ""
-                local lastChangedAt = tick()
+                --   1. fishCaught  → HP=0 VÀ dist đã từng >0  (câu thành công)
+                --   2. fishEscaped → cur > max                 (cá thoát: 52m/50m)
+                --   3. stale       → text không đổi 1.2s       (không đang câu)
+                local STALE_SEC      = 1.2
+                local watchText      = readDistText() or ""
+                local lastChangedAt  = tick()
+                -- Guard: chỉ check fishCaught sau khi dist đã lên >0 ít nhất 1 lần
+                -- Tránh false positive lúc HP=0 trước khi bắt đầu kéo cá
+                local distWasNonZero = false
 
                 task.spawn(function()
                     while running and fishActive do
                         task.wait(0.05)
 
-                        -- Điều kiện 1: câu thành công (HP = 0)
-                        if fishCaught() then
+                        local t = readDistText()
+                        if t == nil then
                             fishActive = false
                             break
                         end
 
-                        local t = readDistText()
-                        if t == nil then
-                            -- Không đọc được UI → kết thúc phiên
+                        -- Theo dõi dist đã lên > 0 chưa
+                        local curStr = t:match("^(%d+)m/%d+m$")
+                        if curStr and tonumber(curStr) > 0 then
+                            distWasNonZero = true
+                        end
+
+                        -- Điều kiện 1: câu thành công (HP=0 VÀ dist đã từng >0)
+                        if distWasNonZero and fishCaught() then
                             fishActive = false
                             break
                         end
