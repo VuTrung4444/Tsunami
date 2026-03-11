@@ -28,7 +28,6 @@ local IsOpen = Subs.Wait
 	local SpeedAndJump = MiscTab:CreateSection({Name = "Speed&Jump[P]", Side = "Right"})
 	local Ect = MiscTab:CreateSection({Name = "Ect", Side = "Left"})
 
-
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -36,15 +35,8 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
--- ============================================================
--- TEXTBOX CONFIG
--- ============================================================
 local priorityStr = ""
 local comboStr    = ""
-
--- ============================================================
--- KEY HELPERS
--- ============================================================
 
 local keyCodeMap = {
     Z = Enum.KeyCode.Z,
@@ -93,14 +85,10 @@ end
 local function pressSkill(keyChar)
     if isMobile then
         local coords = skillTouchCoords[keyChar]
-        if coords then
-            touchClick(coords.x, coords.y)
-        end
+        if coords then touchClick(coords.x, coords.y) end
     else
         local kc = keyCodeMap[keyChar]
-        if kc then
-            pressKey(kc)
-        end
+        if kc then pressKey(kc) end
     end
 end
 
@@ -117,53 +105,60 @@ local function pressM1PC()
 end
 
 local function clickM1()
-    if isMobile then
-        pressM1()
-    else
-        pressM1PC()
-    end
+    if isMobile then pressM1() else pressM1PC() end
 end
-
--- ============================================================
--- SKILL STATE
--- ============================================================
 
 local function isSkillReady(keyChar)
     local path = skillPathMap[keyChar]
     if not path then return false end
-    local success, text = pcall(function()
+    local ok, text = pcall(function()
         return PlayerGui.RodGUI.Skills[path].Inside.Text
     end)
-    return success and text == keyChar
+    return ok and text == keyChar
 end
 
 local function getSkillCooldown(keyChar)
     local path = skillPathMap[keyChar]
     if not path then return 0 end
-    local success, text = pcall(function()
+    local ok, text = pcall(function()
         return PlayerGui.RodGUI.Skills[path].Inside.Text
     end)
-    if not success then return 0 end
+    if not ok then return 0 end
     if text == keyChar then return 0 end
-    local seconds = text:match("^(%d+)s$")
-    if seconds then return tonumber(seconds) end
+    local s = text:match("^(%d+)s$")
+    if s then return tonumber(s) end
     return 999
 end
 
--- Đọc currentDist từ DistanceFrame, trả về số nguyên hoặc nil
-local function getCurrentDist()
-    local success, cur = pcall(function()
-        local distText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-        local c, _ = distText:match("^(%d+)m/(%d+)m$")
-        return c and tonumber(c) or nil
+local function readDistText()
+    local ok, val = pcall(function()
+        return PlayerGui.FishStats.DistanceFrame.HealthText.Text
     end)
-    if success then return cur end
-    return nil
+    return ok and val or nil
 end
 
--- ============================================================
--- COMBO STATE
--- ============================================================
+-- Parse "NNm/NNm" → current, max (số) hoặc nil, nil
+local function parseDist(text)
+    if not text then return nil, nil end
+    local c, m = text:match("^(%d+)m/(%d+)m$")
+    return c and tonumber(c) or nil, m and tonumber(m) or nil
+end
+
+-- Điều kiện 1: cá thoát (52m/50m → cur > max)
+local function fishEscaped(text)
+    local c, m = parseDist(text)
+    return c ~= nil and m ~= nil and c > m
+end
+
+-- Điều kiện 3: câu thành công — HP cá = 0
+local function fishCaught()
+    local ok, result = pcall(function()
+        local hp = PlayerGui.FishStats.HealthFrame.HealthText.Text
+        local cur = hp:match("^(%d+)/%d+$")
+        return cur ~= nil and tonumber(cur) == 0
+    end)
+    return ok and result
+end
 
 local comboPhase = 0
 local cachedKey1 = nil
@@ -174,10 +169,6 @@ local function resetCombo()
     cachedKey1 = nil
     cachedKey2 = nil
 end
-
--- ============================================================
--- TOGGLE + TEXTBOX
--- ============================================================
 
 local running = false
 
@@ -203,7 +194,6 @@ Auto:AddToggle({
     Default = false,
     Callback = function(state)
         running = state
-
         if not running then
             resetCombo()
             return
@@ -213,139 +203,114 @@ Auto:AddToggle({
             while running do
                 clickM1()
 
-                local prevDistText = ""
-                pcall(function()
-                    prevDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-                end)
-
+                -- Chờ cá cắn: DistanceFrame thay đổi
+                local prevText = readDistText() or ""
                 local fishBiting = false
                 local waitStart = tick()
 
                 while running do
-                    local currentDistText = ""
-                    pcall(function()
-                        currentDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-                    end)
-
-                    if currentDistText ~= prevDistText then
+                    local t = readDistText() or ""
+                    if t ~= prevText then
                         fishBiting = true
                         break
                     end
-
-                    if tick() - waitStart >= 1 then
-                        break
-                    end
-
+                    if tick() - waitStart >= 1 then break end
                     task.wait(0.05)
                 end
 
-                if fishBiting then
-                    resetCombo()
-                    local lastSkillTime = 0
-                    local skillBusy = false
+                if not fishBiting then continue end
 
-                    -- ── Phát hiện cá thoát bằng cách đếm số tick text không đổi ──
-                    -- Ngoại lệ: bỏ qua nếu currentDist <= 3 (cá sắp chết, text tạm đứng yên)
-                    local STALE_MAX  = 20          -- 20 × 0.05s = 1 giây liên tục không đổi
-                    local staleCount = 0
-                    local lastDistText = ""
-                    pcall(function()
-                        lastDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-                    end)
+                -- ── Vòng lặp chiêu ──────────────────────────────────────────
+                resetCombo()
+                local skillBusy     = false
+                local lastSkillTime = 0
+                local fishActive    = true
 
-                    local fishActive = true        -- true = đang câu, false = cá thoát/hết
+                -- Watchdog: 3 điều kiện kết thúc phiên câu
+                --   1. fishCaught  → HP cá = 0          (câu thành công)
+                --   2. fishEscaped → cur > max           (cá thoát: 52m/50m)
+                --   3. stale       → text không đổi 1.2s (không đang câu)
+                local STALE_SEC     = 1.2
+                local watchText     = readDistText() or ""
+                local lastChangedAt = tick()
 
+                task.spawn(function()
                     while running and fishActive do
-                        local now = tick()
+                        task.wait(0.05)
 
-                        -- Đọc text hiện tại
-                        local curDistText = ""
-                        pcall(function()
-                            curDistText = PlayerGui.FishStats.DistanceFrame.HealthText.Text
-                        end)
-
-                        if curDistText == lastDistText then
-                            -- Text đứng yên — kiểm tra xem có phải gần 0 không
-                            local cur = getCurrentDist()
-                            if cur == nil or cur > 3 then
-                                -- Không phải trường hợp cá sắp chết → đếm stale
-                                staleCount = staleCount + 1
-                                if staleCount >= STALE_MAX then
-                                    fishActive = false
-                                    break
-                                end
-                            else
-                                staleCount = 0  -- gần 0m → reset, không tính là stale
-                            end
-                        else
-                            -- Text thay đổi → cá vẫn đang kéo → reset counter
-                            staleCount   = 0
-                            lastDistText = curDistText
+                        -- Điều kiện 1: câu thành công (HP = 0)
+                        if fishCaught() then
+                            fishActive = false
+                            break
                         end
 
-                        -- ── Gọi chiêu ────────────────────────────────────────────
-                        if not skillBusy and now - lastSkillTime >= 0.5 then
-                            local k1 = comboStr ~= "" and comboStr:sub(1,1):upper() or nil
-                            local k2 = comboStr ~= "" and #comboStr >= 2 and comboStr:sub(2,2):upper() or nil
-                            local hasCombo = k1 and k2 and keyCodeMap[k1] and keyCodeMap[k2]
+                        local t = readDistText()
+                        if t == nil then
+                            -- Không đọc được UI → kết thúc phiên
+                            fishActive = false
+                            break
+                        end
 
-                            local comboBlocked = {}
-                            if hasCombo then
-                                comboBlocked[k1] = true
-                                comboBlocked[k2] = true
+                        -- Điều kiện 2: cá thoát (cur > max)
+                        if fishEscaped(t) then
+                            fishActive = false
+                            break
+                        end
+
+                        -- Điều kiện 3: stale — text không đổi quá STALE_SEC
+                        if t ~= watchText then
+                            watchText = t
+                            lastChangedAt = tick()
+                        elseif tick() - lastChangedAt >= STALE_SEC then
+                            fishActive = false
+                            break
+                        end
+                    end
+                end)
+
+                -- Vòng gọi chiêu
+                while running and fishActive do
+                    local now = tick()
+
+                    if not skillBusy and now - lastSkillTime >= 0.5 then
+                        local k1 = comboStr ~= "" and comboStr:sub(1,1):upper() or nil
+                        local k2 = comboStr ~= "" and #comboStr >= 2 and comboStr:sub(2,2):upper() or nil
+                        local hasCombo = k1 and k2 and keyCodeMap[k1] and keyCodeMap[k2]
+
+                        local comboBlocked = {}
+                        if hasCombo then
+                            comboBlocked[k1] = true
+                            comboBlocked[k2] = true
+                        end
+                        local function isBlocked(k) return comboBlocked[k] == true end
+
+                        skillBusy = true
+                        lastSkillTime = now
+
+                        task.spawn(function()
+                            if not fishActive then
+                                skillBusy = false
+                                return
                             end
 
-                            local function isBlocked(k) return comboBlocked[k] == true end
+                            if comboPhase == 1 and cachedKey2 ~= nil then
+                                pressSkill(cachedKey2)
+                                resetCombo()
 
-                            skillBusy = true
-                            lastSkillTime = now
-
-                            task.spawn(function()
-                                -- Guard: nếu cá đã thoát trong lúc chờ spawn thì bỏ qua
-                                if not fishActive then
-                                    skillBusy = false
-                                    return
-                                end
-
-                                if comboPhase == 1 and cachedKey2 ~= nil then
-                                    pressSkill(cachedKey2)
-                                    resetCombo()
-
-                                elseif hasCombo then
-                                    local cd1 = getSkillCooldown(k1)
-                                    local cd2 = getSkillCooldown(k2)
-                                    if cd1 == 0 and cd2 <= 4 then
-                                        cachedKey1 = k1
-                                        cachedKey2 = k2
-                                        comboPhase = 1
-                                        pressSkill(k1)
-                                    else
-                                        if priorityStr ~= "" then
-                                            for i = 1, #priorityStr do
-                                                if not fishActive then break end
-                                                local kc = priorityStr:sub(i,i):upper()
-                                                if not isBlocked(kc) and isSkillReady(kc) then
-                                                    pressSkill(kc)
-                                                    break
-                                                end
-                                            end
-                                        else
-                                            for _, kc in ipairs({"Z","X","C","V"}) do
-                                                if not fishActive then break end
-                                                if not isBlocked(kc) and isSkillReady(kc) then
-                                                    pressSkill(kc)
-                                                    break
-                                                end
-                                            end
-                                        end
-                                    end
-
+                            elseif hasCombo then
+                                local cd1 = getSkillCooldown(k1)
+                                local cd2 = getSkillCooldown(k2)
+                                if cd1 == 0 and cd2 <= 4 then
+                                    cachedKey1 = k1
+                                    cachedKey2 = k2
+                                    comboPhase = 1
+                                    pressSkill(k1)
                                 else
                                     if priorityStr ~= "" then
                                         for i = 1, #priorityStr do
                                             if not fishActive then break end
                                             local kc = priorityStr:sub(i,i):upper()
-                                            if isSkillReady(kc) then
+                                            if not isBlocked(kc) and isSkillReady(kc) then
                                                 pressSkill(kc)
                                                 break
                                             end
@@ -353,7 +318,7 @@ Auto:AddToggle({
                                     else
                                         for _, kc in ipairs({"Z","X","C","V"}) do
                                             if not fishActive then break end
-                                            if isSkillReady(kc) then
+                                            if not isBlocked(kc) and isSkillReady(kc) then
                                                 pressSkill(kc)
                                                 break
                                             end
@@ -361,19 +326,38 @@ Auto:AddToggle({
                                     end
                                 end
 
-                                skillBusy = false
-                            end)
-                        end
+                            else
+                                if priorityStr ~= "" then
+                                    for i = 1, #priorityStr do
+                                        if not fishActive then break end
+                                        local kc = priorityStr:sub(i,i):upper()
+                                        if isSkillReady(kc) then
+                                            pressSkill(kc)
+                                            break
+                                        end
+                                    end
+                                else
+                                    for _, kc in ipairs({"Z","X","C","V"}) do
+                                        if not fishActive then break end
+                                        if isSkillReady(kc) then
+                                            pressSkill(kc)
+                                            break
+                                        end
+                                    end
+                                end
+                            end
 
-                        task.wait(0.05)
+                            skillBusy = false
+                        end)
                     end
 
-                    -- Chờ skillBusy kết thúc (tối đa 1s) rồi mới clickM1 lại
-                    local waitBusy = tick()
-                    while skillBusy and tick() - waitBusy < 1 do
-                        task.wait(0.05)
-                    end
-                    -- Vòng ngoài sẽ tự gọi clickM1() ở đầu iteration tiếp theo
+                    task.wait(0.05)
+                end
+
+                -- Chờ skill đang bấm xong (tối đa 1.5s) rồi clickM1 lại
+                local t0 = tick()
+                while skillBusy and tick() - t0 < 1.5 do
+                    task.wait(0.05)
                 end
             end
         end)
