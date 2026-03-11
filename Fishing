@@ -412,20 +412,24 @@ Auto:AddToggle({
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local isRunning = false
+
 Auto:AddToggle({
     Name = "Auto Gacha",
     Default = false,
     Callback = function(state)
+        isRunning = state
         if state then
             task.spawn(function()
-                while Auto:GetToggle("Auto Function 16") do
+                while isRunning do
                     local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[16]
                     if remoteFunction and remoteFunction:IsA("RemoteFunction") then
                         pcall(function()
                             remoteFunction:InvokeServer()
                         end)
                     end
-                    task.wait(4)
+                    task.wait(6)
                 end
             end)
         end
