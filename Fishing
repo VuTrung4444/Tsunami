@@ -340,10 +340,42 @@ Auto:AddToggle({
 })
 
 
-
+local Players = game:GetService("Players")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer.PlayerGui
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- ============================================================
+-- INDEX CONFIG
+-- ============================================================
+local gachaIndex = 16
+local sellIndex  = 51
+
+-- ============================================================
+-- TEXTBOX: Nhập số thứ tự lệnh
+-- ============================================================
+Auto:AddTextbox({
+    Name = "Index Gacha",
+    Default = "16",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then gachaIndex = num end
+    end
+})
+
+Auto:AddTextbox({
+    Name = "Index Sell",
+    Default = "51",
+    Callback = function(value)
+        local num = tonumber(value)
+        if num then sellIndex = num end
+    end
+})
+
+-- ============================================================
+-- AUTO GACHA
+-- ============================================================
 local isRunning = false
 
 Auto:AddToggle({
@@ -354,7 +386,7 @@ Auto:AddToggle({
         if state then
             task.spawn(function()
                 while isRunning do
-                    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[16]
+                    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[gachaIndex]
                     if remoteFunction and remoteFunction:IsA("RemoteFunction") then
                         pcall(function()
                             remoteFunction:InvokeServer()
@@ -366,14 +398,6 @@ Auto:AddToggle({
         end
     end
 })
-
-
-
-local Players = game:GetService("Players")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer.PlayerGui
 
 -- ============================================================
 -- BƯỚC 1: Click nút Inventory trên HUD
@@ -437,10 +461,10 @@ local function clickFish1To4()
 end
 
 -- ============================================================
--- Gọi RemoteFunction 51 (4 lần = 4 lần bán)
+-- Gọi RemoteFunction Sell (4 lần = 4 lần bán)
 -- ============================================================
-local function invokeFunction51()
-    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[51]
+local function invokeSell()
+    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[sellIndex]
     for i = 1, 4 do
         pcall(function()
             if remoteFunction and remoteFunction:IsA("RemoteFunction") then
@@ -452,9 +476,8 @@ local function invokeFunction51()
 end
 
 -- ============================================================
--- TOGGLE
+-- AUTO SELL
 -- ============================================================
-
 local running = false
 
 Auto:AddToggle({
@@ -476,9 +499,8 @@ Auto:AddToggle({
                 clickFish1To4()
                 task.wait(0.5)
 
-                invokeFunction51()
+                invokeSell()
 
-                -- Chờ 4 phút trước khi lặp lại
                 local waited = 0
                 while running and waited < 60 do
                     task.wait(1)
@@ -808,30 +830,32 @@ SpeedAndJump:AddSlider({
     end
 })
 
---[[ LocalScript: Gọi InvokeServer toàn bộ RemoteFunction trong Functions (giãn cách 1 giây)
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Functions = ReplicatedStorage.Communication.Functions
 
-local children = Functions:GetChildren()
-print("📦 Tổng số Function tìm thấy:", #children)
+Auto:AddButton({
+    Name = "Quét tất cả Functions",
+    Callback = function()
+        local Functions = ReplicatedStorage.Communication.Functions
+        local children = Functions:GetChildren()
+        print("📦 Tổng số Function tìm thấy:", #children)
 
-for i, remoteFunction in ipairs(children) do
-    if remoteFunction:IsA("RemoteFunction") then
-        local success, result = pcall(function()
-            return remoteFunction:InvokeServer()
-        end)
-
-        if success then
-            print(string.format("✅ [%d] '%s' => %s", i, remoteFunction.Name, tostring(result)))
-        else
-            warn(string.format("❌ [%d] '%s' => Lỗi: %s", i, remoteFunction.Name, tostring(result)))
+        for i, remoteFunction in ipairs(children) do
+            if remoteFunction:IsA("RemoteFunction") then
+                local success, result = pcall(function()
+                    return remoteFunction:InvokeServer()
+                end)
+                if success then
+                    print(string.format("✅ [%d] '%s' => %s", i, remoteFunction.Name, tostring(result)))
+                else
+                    warn(string.format("❌ [%d] '%s' => Lỗi: %s", i, remoteFunction.Name, tostring(result)))
+                end
+            else
+                print(string.format("⏭️ [%d] '%s' => Bỏ qua (loại: %s)", i, remoteFunction.Name, remoteFunction.ClassName))
+            end
+            task.wait(0.6)
         end
-    else
-        print(string.format("⏭️ [%d] '%s' => Bỏ qua (loại: %s)", i, remoteFunction.Name, remoteFunction.ClassName))
+
+        print("🏁 Hoàn tất gọi tất cả Functions.")
     end
-
-    task.wait(1) -- ⏱️ Giãn cách 1 giây giữa mỗi lần gọi
-end
-
-print("🏁 Hoàn tất gọi tất cả Functions.")]]
+})
