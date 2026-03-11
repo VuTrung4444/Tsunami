@@ -347,6 +347,29 @@ local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer.PlayerGui
 
 -- ============================================================
+-- MOBILE CHECK (1 lần duy nhất)
+-- ============================================================
+local function checkIsMobile()
+    local success, pos = pcall(function()
+        return PlayerGui.RodGUI.Skills.AbsolutePosition
+    end)
+    if not success then return false end
+    return math.abs(pos.X - 636.539) <= 0.5 and math.abs(pos.Y - 60.251) <= 0.5
+end
+local isMobile = checkIsMobile()
+
+-- ============================================================
+-- HELPER: click toạ độ
+-- ============================================================
+local function clickAt(x, y)
+    VirtualInputManager:SendMouseMoveEvent(x, y, game)
+    task.wait(0.05)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game, 0)
+    task.wait(0.1)
+    VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game, 0)
+end
+
+-- ============================================================
 -- INDEX CONFIG
 -- ============================================================
 local gachaIndex = 16
@@ -400,68 +423,76 @@ Auto:AddToggle({
 })
 
 -- ============================================================
--- BƯỚC 1: Click nút Inventory trên HUD
+-- BƯỚC 1: Click nút Inventory
 -- ============================================================
 local function clickInventory()
-    pcall(function()
-        local target = PlayerGui.HUD.Canvas.Buttons.Inventory.Main.TextLabel
-        local pos = target.AbsolutePosition
-        local centerX = math.floor(pos.X * 2)
-        local centerY = math.floor(pos.Y + 50)
-        VirtualInputManager:SendMouseMoveEvent(centerX, centerY, game)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-        task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-    end)
+    if isMobile then
+        pcall(function() clickAt(70, 215) end)
+    else
+        pcall(function()
+            local target = PlayerGui.HUD.Canvas.Buttons.Inventory.Main.TextLabel
+            local pos = target.AbsolutePosition
+            local centerX = math.floor(pos.X * 2)
+            local centerY = math.floor(pos.Y + 50)
+            clickAt(centerX, centerY)
+        end)
+    end
 end
 
 -- ============================================================
 -- BƯỚC 2: Click tab Fish trong Inventory
 -- ============================================================
 local function clickFishTab()
-    pcall(function()
-        local target = PlayerGui.Inventory.Canvas.Main.Buttons.Fish.TextLabel
-        local pos = target.AbsolutePosition
-        local size = target.AbsoluteSize
-        local centerX = math.floor(pos.X + size.X / 2)
-        local centerY = math.floor(pos.Y + size.Y * 2.1)
-        VirtualInputManager:SendMouseMoveEvent(centerX, centerY, game)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, true, game, 0)
-        task.wait(0.1)
-        VirtualInputManager:SendMouseButtonEvent(centerX, centerY, 0, false, game, 0)
-    end)
+    if isMobile then
+        pcall(function() clickAt(250, 135) end)
+    else
+        pcall(function()
+            local target = PlayerGui.Inventory.Canvas.Main.Buttons.Fish.TextLabel
+            local pos = target.AbsolutePosition
+            local size = target.AbsoluteSize
+            local centerX = math.floor(pos.X + size.X / 2)
+            local centerY = math.floor(pos.Y + size.Y * 2.1)
+            clickAt(centerX, centerY)
+        end)
+    end
 end
 
 -- ============================================================
 -- BƯỚC 3: Click Fish_1 đến Fish_4
 -- ============================================================
+local mobileFishCoords = {
+    {x = 300, y = 185},
+    {x = 390, y = 185},
+    {x = 480, y = 185},
+    {x = 570, y = 185},
+}
+
 local function clickFish1To4()
-    local thingFrame = PlayerGui.Inventory.Canvas.Main.ThingFrame
-
-    for index = 1, 4 do
-        local fishObj = thingFrame:FindFirstChild("Fish_" .. index)
-
-        if fishObj then
-            pcall(function()
-                local fishName = fishObj.Main.FishName
-                local weight   = fishObj.Main.Weight
-                local clickX = math.floor(fishName.AbsolutePosition.X)
-                local clickY = math.floor(fishName.AbsolutePosition.Y + weight.AbsolutePosition.Y / 2)
-                VirtualInputManager:SendMouseMoveEvent(clickX, clickY, game)
-                task.wait(0.05)
-                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 0)
-                task.wait(0.1)
-                VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 0)
-            end)
+    if isMobile then
+        for _, coord in ipairs(mobileFishCoords) do
+            pcall(function() clickAt(coord.x, coord.y) end)
             task.wait(0.5)
+        end
+    else
+        local thingFrame = PlayerGui.Inventory.Canvas.Main.ThingFrame
+        for index = 1, 4 do
+            local fishObj = thingFrame:FindFirstChild("Fish_" .. index)
+            if fishObj then
+                pcall(function()
+                    local fishName = fishObj.Main.FishName
+                    local weight   = fishObj.Main.Weight
+                    local clickX = math.floor(fishName.AbsolutePosition.X)
+                    local clickY = math.floor(fishName.AbsolutePosition.Y + weight.AbsolutePosition.Y / 2)
+                    clickAt(clickX, clickY)
+                end)
+                task.wait(0.5)
+            end
         end
     end
 end
 
 -- ============================================================
--- Gọi RemoteFunction Sell (4 lần = 4 lần bán)
+-- Gọi RemoteFunction Sell (4 lần)
 -- ============================================================
 local function invokeSell()
     local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[sellIndex]
