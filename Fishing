@@ -372,6 +372,8 @@ Auto:AddToggle({
     end
 })
 
+
+
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -421,7 +423,7 @@ Auto:AddTextbox({
 
 Auto:AddTextbox({
     Name = "Index Sell",
-    Default = "24",
+    Default = "51",
     Callback = function(value)
         local num = tonumber(value)
         if num then sellIndex = num end
@@ -893,23 +895,43 @@ SpeedAndJump:AddSlider({
     end
 })
 
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 Auto:AddButton({
     Name = "Quét tất cả Functions",
     Callback = function()
+        local player = Players.LocalPlayer
+        local leaderstats = player:WaitForChild("leaderstats")
+        local money = leaderstats:WaitForChild("Money")
+        
         local Functions = ReplicatedStorage.Communication.Functions
         local children = Functions:GetChildren()
         print("📦 Tổng số Function tìm thấy:", #children)
-
+        
+        local sellCommands = {} -- Lưu các lệnh bán
+        
         for i, remoteFunction in ipairs(children) do
             if remoteFunction:IsA("RemoteFunction") then
+                local moneyBefore = money.Value
+                
                 local success, result = pcall(function()
                     return remoteFunction:InvokeServer()
                 end)
+                
+                task.wait(0.2)
+                
+                local moneyAfter = money.Value
+                local moneyChange = moneyAfter - moneyBefore
+                
                 if success then
                     print(string.format("✅ [%d] '%s' => %s", i, remoteFunction.Name, tostring(result)))
+                    
+                    if moneyChange ~= 0 then
+                        local sellInfo = string.format("[%d] '%s' - Thay đổi: %+d", i, remoteFunction.Name, moneyChange)
+                        print("💰 Lệnh bán - " .. sellInfo)
+                        table.insert(sellCommands, sellInfo)
+                    end
                 else
                     warn(string.format("❌ [%d] '%s' => Lỗi: %s", i, remoteFunction.Name, tostring(result)))
                 end
@@ -918,7 +940,16 @@ Auto:AddButton({
             end
             task.wait(0.6)
         end
-
-        print("🏁 Hoàn tất gọi tất cả Functions.")
+        
+        print("\n🏁 Hoàn tất gọi tất cả Functions.")
+        
+        if #sellCommands > 0 then
+            print("\n=== TÓM TẮT CÁC LỆNH BÁN ===")
+            for _, cmd in ipairs(sellCommands) do
+                print("💰 " .. cmd)
+            end
+        else
+            print("\n❌ Không tìm thấy lệnh bán nào")
+        end
     end
 })
