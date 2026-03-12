@@ -214,7 +214,7 @@ Auto:AddToggle({
                         fishBiting = true
                         break
                     end
-                    if tick() - waitStart >= 4 then break end
+                    if tick() - waitStart >= 2 then break end
                     task.wait(0.05)
                 end
 
@@ -408,6 +408,7 @@ end
 -- ============================================================
 local gachaIndex = 16
 local sellIndex  = 51
+local sellInterval = 60 -- Thời gian chờ giữa các lần bán (giây)
 
 -- ============================================================
 -- TEXTBOX: Nhập số thứ tự lệnh
@@ -427,6 +428,22 @@ Auto:AddTextbox({
     Callback = function(value)
         local num = tonumber(value)
         if num then sellIndex = num end
+    end
+})
+
+-- ============================================================
+-- SLIDER: Điều chỉnh thời gian bán cá
+-- ============================================================
+Auto:AddSlider({
+    Name = "Thời gian bán cá (s)",
+    Flag = "SellInterval",
+    Value = sellInterval,
+    Min = 1,
+    Max = 300,
+    Textbox = true,
+    Callback = function(value)
+        sellInterval = value
+        print("Thời gian bán cá đã được đặt thành:", sellInterval, "giây")
     end
 })
 
@@ -566,8 +583,9 @@ Auto:AddToggle({
 
                 invokeSell()
 
+                -- Sử dụng sellInterval thay vì 60s cố định
                 local waited = 0
-                while running and waited < 60 do
+                while running and waited < sellInterval do
                     task.wait(1)
                     waited = waited + 1
                 end
