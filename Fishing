@@ -214,7 +214,7 @@ Auto:AddToggle({
                         fishBiting = true
                         break
                     end
-                    if tick() - waitStart >= 1 then break end
+                    if tick() - waitStart >= 4 then break end
                     task.wait(0.05)
                 end
 
