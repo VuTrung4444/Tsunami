@@ -923,7 +923,7 @@ Auto:AddButton({
             else
                 print(string.format("⏭️ [%d] '%s' => Bỏ qua (loại: %s)", i, remoteFunction.Name, remoteFunction.ClassName))
             end
-            task.wait(0.6)
+            task.wait(0.2)
         end
         
         print("\n🏁 Hoàn tất gọi tất cả Functions.")
