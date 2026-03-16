@@ -904,7 +904,7 @@ Auto:AddButton({
                     return remoteFunction:InvokeServer()
                 end)
                 
-                task.wait(0.2)
+                task.wait(0.02)
                 
                 local moneyAfter = money.Value
                 local moneyChange = moneyAfter - moneyBefore
@@ -923,7 +923,7 @@ Auto:AddButton({
             else
                 print(string.format("⏭️ [%d] '%s' => Bỏ qua (loại: %s)", i, remoteFunction.Name, remoteFunction.ClassName))
             end
-            task.wait(0.2)
+            task.wait(0.02)
         end
         
         print("\n🏁 Hoàn tất gọi tất cả Functions.")
