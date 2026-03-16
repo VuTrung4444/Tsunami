@@ -713,7 +713,7 @@ Ect:AddToggle({
 local SelectedIsland = nil
 local Islands = {}
 
-local islandNames = {"Island 1", "Island 2", "Island 3", "Island 4", "Island 5"}
+local islandNames = {"Island 1", "Island 2", "Island 3", "Island 4", "Island 5", "Island 6", "Island 7"}
 
 for _, name in ipairs(islandNames) do
 	local success, islandPart = pcall(function()
