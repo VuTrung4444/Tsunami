@@ -717,11 +717,14 @@ local islandNames = {"Island 1", "Island 2", "Island 3", "Island 4", "Island 5",
 
 for _, name in ipairs(islandNames) do
 	local success, islandPart = pcall(function()
-		return workspace:WaitForChild("SpawnLocation"):WaitForChild(name):WaitForChild("Part")
+		local islandFolder = workspace:WaitForChild("SpawnLocation"):WaitForChild(name)
+		return islandFolder:GetChildren()[3]
 	end)
 
 	if success and islandPart then
 		Islands[name] = islandPart
+	else
+		warn(name .. " không có object thứ 3!")
 	end
 end
 
@@ -755,7 +758,7 @@ Teleports:AddButton({
 			local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 
 			if hrp and SelectedIsland:IsDescendantOf(workspace) then
-				local offsetY = 10
+				local offsetY = 2
 				hrp.CFrame = SelectedIsland.CFrame + Vector3.new(0, offsetY, 0)
 				task.wait(1)
 			else
