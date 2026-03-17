@@ -491,7 +491,7 @@ end
 local running = false
 
 Auto:AddToggle({
-    Name = "Auto Sell Equip Fish",
+    Name = "Auto Sell",
     Default = false,
     Callback = function(state)
         running = state
@@ -500,7 +500,7 @@ Auto:AddToggle({
 
         task.spawn(function()
             while running do
-                -- Lặp bán mỗi 1s cho đến khi hết cá
+                -- Lặp bán cho đến khi hết cá
                 while running and hasFishInBackpack() do
                     local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[sellIndex]
                     pcall(function()
@@ -508,7 +508,7 @@ Auto:AddToggle({
                             remoteFunction:InvokeServer()
                         end
                     end)
-                    task.wait(1)
+                    task.wait(0.3)
                 end
 
                 -- Hết cá → chờ sellInterval giây
