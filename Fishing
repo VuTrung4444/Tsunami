@@ -473,19 +473,6 @@ Auto:AddToggle({
 })
 
 -- ============================================================
--- KIỂM TRA CÒN CÁ TRONG BACKPACK
--- ============================================================
-local function hasFishInBackpack()
-    local backpack = LocalPlayer.Backpack
-    for _, item in ipairs(backpack:GetChildren()) do
-        if item.Name:match("%(.-kg%)") then
-            return true
-        end
-    end
-    return false
-end
-
--- ============================================================
 -- AUTO SELL
 -- ============================================================
 local running = false
@@ -495,23 +482,19 @@ Auto:AddToggle({
     Default = false,
     Callback = function(state)
         running = state
-
         if not running then return end
 
         task.spawn(function()
             while running do
-                -- Lặp bán mỗi 1s cho đến khi hết cá
-                while running and hasFishInBackpack() do
-                    local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[sellIndex]
-                    pcall(function()
-                        if remoteFunction and remoteFunction:IsA("RemoteFunction") then
-                            remoteFunction:InvokeServer()
-                        end
-                    end)
-                    task.wait(1)
-                end
+                -- Gọi lệnh bán 1 lần
+                local remoteFunction = ReplicatedStorage.Communication.Functions:GetChildren()[sellIndex]
+                pcall(function()
+                    if remoteFunction and remoteFunction:IsA("RemoteFunction") then
+                        remoteFunction:InvokeServer()
+                    end
+                end)
 
-                -- Hết cá → chờ sellInterval giây
+                -- Chờ sellInterval giây rồi lặp lại
                 local waited = 0
                 while running and waited < sellInterval do
                     task.wait(1)
@@ -521,7 +504,6 @@ Auto:AddToggle({
         end)
     end
 })
-
 
 
 local TeleportService = game:GetService("TeleportService")
