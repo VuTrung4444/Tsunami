@@ -38,6 +38,9 @@ local PlayerGui = LocalPlayer.PlayerGui
 local priorityStr = ""
 local comboStr    = ""
 
+local filterEpic      = false
+local filterLegendary = false
+
 local keyCodeMap = {
     Z = Enum.KeyCode.Z,
     X = Enum.KeyCode.X,
@@ -137,20 +140,47 @@ local function readDistText()
     return ok and val or nil
 end
 
--- Parse "NNm/NNm" → current, max (số) hoặc nil, nil
+-- Đọc tên/độ hiếm cá hiện tại
+local function readFishName()
+    local ok, val = pcall(function()
+        return PlayerGui.FishStats.HealthFrame.FishName.Text
+    end)
+    return ok and val or nil
+end
+
+-- Kiểm tra cá có thuộc loại được phép chiến đấu không
+-- Trả về true nếu không có filter nào được bật,
+-- hoặc tên cá khớp với filter đang bật
+local function isFishAllowed()
+    -- Nếu không bật filter nào → câu tất cả
+    if not filterEpic and not filterLegendary then
+        return true
+    end
+
+    local name = readFishName()
+    if not name then return false end
+
+    if filterEpic and name:match("^Epic%s*%[%d+%]") then
+        return true
+    end
+    if filterLegendary and name:match("^Legendary%s*%[%d+%]") then
+        return true
+    end
+
+    return false
+end
+
 local function parseDist(text)
     if not text then return nil, nil end
     local c, m = text:match("^(%d+)m/(%d+)m$")
     return c and tonumber(c) or nil, m and tonumber(m) or nil
 end
 
--- Điều kiện 1: cá thoát (52m/50m → cur > max)
 local function fishEscaped(text)
     local c, m = parseDist(text)
     return c ~= nil and m ~= nil and c > m
 end
 
--- Điều kiện 3: câu thành công — HP cá = 0
 local function fishCaught()
     local ok, result = pcall(function()
         local hp = PlayerGui.FishStats.HealthFrame.HealthText.Text
@@ -189,6 +219,24 @@ Auto:AddTextbox({
     end
 })
 
+-- ── Toggle lọc độ hiếm cá ───────────────────────────────────────────────────
+Ect:AddToggle({
+    Name = "Câu cá Epic",
+    Default = false,
+    Callback = function(state)
+        filterEpic = state
+    end
+})
+
+Ect:AddToggle({
+    Name = "Câu cá Legendary",
+    Default = false,
+    Callback = function(state)
+        filterLegendary = state
+    end
+})
+-- ────────────────────────────────────────────────────────────────────────────
+
 Auto:AddToggle({
     Name = "Auto Fishing",
     Default = false,
@@ -220,21 +268,40 @@ Auto:AddToggle({
 
                 if not fishBiting then continue end
 
+                -- ── Kiểm tra độ hiếm cá ─────────────────────────────────────
+                -- Chờ tối đa 0.5s để FishName cập nhật (đôi khi có độ trễ nhỏ)
+                local fishAllowed = false
+                local checkStart  = tick()
+                while tick() - checkStart < 0.5 do
+                    if isFishAllowed() then
+                        fishAllowed = true
+                        break
+                    end
+                    task.wait(0.05)
+                end
+
+                if not fishAllowed then
+                    -- Cá không đủ độ hiếm → chờ cá tự thoát, không làm gì
+                    while running do
+                        local t = readDistText()
+                        -- Cá thoát khi cur > max, hoặc text biến mất
+                        if t == nil or fishEscaped(t) then break end
+                        task.wait(0.1)
+                    end
+                    -- Sau khi cá thoát → quay lại vòng ngoài để clickM1 câu lại
+                    continue
+                end
+                -- ─────────────────────────────────────────────────────────────
+
                 -- ── Vòng lặp chiêu ──────────────────────────────────────────
                 resetCombo()
                 local skillBusy     = false
                 local lastSkillTime = 0
                 local fishActive    = true
 
-                -- Watchdog: 3 điều kiện kết thúc phiên câu
-                --   1. fishCaught  → HP=0 VÀ dist đã từng >0  (câu thành công)
-                --   2. fishEscaped → cur > max                 (cá thoát: 52m/50m)
-                --   3. stale       → text không đổi 1.2s       (không đang câu)
                 local STALE_SEC      = 1.2
                 local watchText      = readDistText() or ""
                 local lastChangedAt  = tick()
-                -- Guard: chỉ check fishCaught sau khi dist đã lên >0 ít nhất 1 lần
-                -- Tránh false positive lúc HP=0 trước khi bắt đầu kéo cá
                 local distWasNonZero = false
 
                 task.spawn(function()
@@ -247,25 +314,21 @@ Auto:AddToggle({
                             break
                         end
 
-                        -- Theo dõi dist đã lên > 0 chưa
                         local curStr = t:match("^(%d+)m/%d+m$")
                         if curStr and tonumber(curStr) > 0 then
                             distWasNonZero = true
                         end
 
-                        -- Điều kiện 1: câu thành công (HP=0 VÀ dist đã từng >0)
                         if distWasNonZero and fishCaught() then
                             fishActive = false
                             break
                         end
 
-                        -- Điều kiện 2: cá thoát (cur > max)
                         if fishEscaped(t) then
                             fishActive = false
                             break
                         end
 
-                        -- Điều kiện 3: stale — text không đổi quá STALE_SEC
                         if t ~= watchText then
                             watchText = t
                             lastChangedAt = tick()
@@ -362,7 +425,6 @@ Auto:AddToggle({
                     task.wait(0.05)
                 end
 
-                -- Chờ skill đang bấm xong (tối đa 1.5s) rồi clickM1 lại
                 local t0 = tick()
                 while skillBusy and tick() - t0 < 1.5 do
                     task.wait(0.05)
@@ -371,7 +433,6 @@ Auto:AddToggle({
         end)
     end
 })
-
 
 
 local Players = game:GetService("Players")
