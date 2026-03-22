@@ -140,7 +140,6 @@ local function readDistText()
     return ok and val or nil
 end
 
--- Đọc tên/độ hiếm cá hiện tại
 local function readFishName()
     local ok, val = pcall(function()
         return PlayerGui.FishStats.HealthFrame.FishName.Text
@@ -148,25 +147,18 @@ local function readFishName()
     return ok and val or nil
 end
 
--- Kiểm tra cá có thuộc loại được phép chiến đấu không
--- Trả về true nếu không có filter nào được bật,
--- hoặc tên cá khớp với filter đang bật
 local function isFishAllowed()
-    -- Nếu không bật filter nào → câu tất cả
     if not filterEpic and not filterLegendary then
         return true
     end
-
     local name = readFishName()
     if not name then return false end
-
     if filterEpic and name:match("^Epic%s*%[%d+%]") then
         return true
     end
     if filterLegendary and name:match("^Legendary%s*%[%d+%]") then
         return true
     end
-
     return false
 end
 
@@ -176,9 +168,25 @@ local function parseDist(text)
     return c and tonumber(c) or nil, m and tonumber(m) or nil
 end
 
-local function fishEscaped(text)
-    local c, m = parseDist(text)
-    return c ~= nil and m ~= nil and c > m
+-- Cá thoát khi cur > max VÀ máu cá > 0
+local function fishEscaped()
+    local ok1, distText = pcall(function()
+        return PlayerGui.FishStats.HealthFrame.DistanceFrame.HealthText.Text
+    end)
+    if not ok1 then return false end
+
+    local cur, max = distText:match("^(%d+)m/(%d+)m$")
+    if not (cur and max) then return false end
+    if tonumber(cur) <= tonumber(max) then return false end
+
+    local ok2, hpText = pcall(function()
+        return PlayerGui.FishStats.HealthFrame.HealthText.Text
+    end)
+    if not ok2 then return false end
+
+    local hpCur, hpMax = hpText:match("^(%d+)/(%d+)$")
+    if not (hpCur and hpMax) then return false end
+    return tonumber(hpCur) > 0
 end
 
 local function fishCaught()
@@ -219,7 +227,6 @@ Auto:AddTextbox({
     end
 })
 
--- ── Toggle lọc độ hiếm cá ───────────────────────────────────────────────────
 Ect:AddToggle({
     Name = "Câu cá Epic",
     Default = false,
@@ -235,7 +242,6 @@ Ect:AddToggle({
         filterLegendary = state
     end
 })
--- ────────────────────────────────────────────────────────────────────────────
 
 Auto:AddToggle({
     Name = "Auto Fishing",
@@ -251,7 +257,6 @@ Auto:AddToggle({
             while running do
                 clickM1()
 
-                -- Chờ cá cắn: DistanceFrame thay đổi
                 local prevText = readDistText() or ""
                 local fishBiting = false
                 local waitStart = tick()
@@ -268,10 +273,9 @@ Auto:AddToggle({
 
                 if not fishBiting then continue end
 
-                -- ── Kiểm tra độ hiếm cá ─────────────────────────────────────
-                -- Chờ tối đa 0.5s để FishName cập nhật (đôi khi có độ trễ nhỏ)
+                -- Chờ tối đa 0.5s để FishName cập nhật
                 local fishAllowed = false
-                local checkStart  = tick()
+                local checkStart = tick()
                 while tick() - checkStart < 0.5 do
                     if isFishAllowed() then
                         fishAllowed = true
@@ -281,19 +285,18 @@ Auto:AddToggle({
                 end
 
                 if not fishAllowed then
-                    -- Cá không đủ độ hiếm → chờ cá tự thoát, không làm gì
+                    -- Chờ cá thoát theo 2 điều kiện
+                    local escapeStart = tick()
                     while running do
-                        local t = readDistText()
-                        -- Cá thoát khi cur > max, hoặc text biến mất
-                        if t == nil or fishEscaped(t) then break end
+                        if fishEscaped() then break end
+                        if tick() - escapeStart >= 4 then break end
                         task.wait(0.1)
                     end
-                    -- Sau khi cá thoát → quay lại vòng ngoài để clickM1 câu lại
+                    task.wait(0.5)
                     continue
                 end
-                -- ─────────────────────────────────────────────────────────────
 
-                -- ── Vòng lặp chiêu ──────────────────────────────────────────
+                -- Vòng lặp chiêu
                 resetCombo()
                 local skillBusy     = false
                 local lastSkillTime = 0
@@ -324,7 +327,7 @@ Auto:AddToggle({
                             break
                         end
 
-                        if fishEscaped(t) then
+                        if fishEscaped() then
                             fishActive = false
                             break
                         end
@@ -339,7 +342,6 @@ Auto:AddToggle({
                     end
                 end)
 
-                -- Vòng gọi chiêu
                 while running and fishActive do
                     local now = tick()
 
@@ -433,7 +435,6 @@ Auto:AddToggle({
         end)
     end
 })
-
 
 local Players = game:GetService("Players")
 local VirtualInputManager = game:GetService("VirtualInputManager")
@@ -583,58 +584,63 @@ Auto:AddToggle({
     end
 })
 
-
-
 local TeleportService = game:GetService("TeleportService")
 local Players = game:GetService("Players")
+local HttpService = game:GetService("HttpService")
 local PLACE_ID = game.PlaceId
+local currentJobId = game.JobId
+
+local function GetServers(cursor)
+    local url = "https://games.roblox.com/v1/games/" .. PLACE_ID .. "/servers/Public?limit=100&sortOrder=Asc"
+    if cursor and cursor ~= "" then
+        url = url .. "&cursor=" .. cursor
+    end
+    local ok, result = pcall(function()
+        return request({ Url = url, Method = "GET" })
+    end)
+    if not ok or not result or not result.Body then return nil end
+    local ok2, data = pcall(function()
+        return HttpService:JSONDecode(result.Body)
+    end)
+    if not ok2 or not data then return nil end
+    return data
+end
 
 MiscSection:AddButton({
     Name = "Hop Server",
     Callback = function()
-        local success, servers = pcall(function()
-            return TeleportService:GetTeleportSetting("servers")
-        end)
-
-        -- Lấy danh sách server hiện có qua teleport options
-        local HttpService = game:GetService("HttpService")
-        local currentJobId = game.JobId
-
-        local foundServer = false
+        local allCandidates = {}
         local cursor = ""
 
         repeat
-            local ok, result = pcall(function()
-                return Players:GetServerList(PLACE_ID, cursor)
-            end)
-            if not ok then break end
+            local data = GetServers(cursor)
+            if not data or not data.data then break end
 
-            -- Lọc bỏ server hiện tại
-            local candidates = {}
-            for _, server in ipairs(result.Servers) do
-                if server.Id ~= currentJobId and server.Playing < server.MaxPlayers then
-                    table.insert(candidates, server)
+            for _, server in ipairs(data.data) do
+                if server.id ~= currentJobId
+                    and type(server.playing) == "number"
+                    and type(server.maxPlayers) == "number"
+                    and server.playing <= server.maxPlayers - 2
+                    and server.playing > 0 then
+                    table.insert(allCandidates, server)
                 end
             end
 
-            if #candidates > 0 then
-                -- Chọn ngẫu nhiên 1 server trong danh sách
-                local chosen = candidates[math.random(1, #candidates)]
-                foundServer = true
-                TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.Id, Players.LocalPlayer)
-                break
-            end
-
-            cursor = result.NextPageCursor
+            cursor = data.nextPageCursor
         until not cursor or cursor == ""
 
-        -- Không tìm thấy server nào khác → rejoin bình thường
-        if not foundServer then
+        if #allCandidates > 0 then
+            for i = #allCandidates, 2, -1 do
+                local j = math.random(1, i)
+                allCandidates[i], allCandidates[j] = allCandidates[j], allCandidates[i]
+            end
+            local chosen = allCandidates[1]
+            TeleportService:TeleportToPlaceInstance(PLACE_ID, chosen.id, Players.LocalPlayer)
+        else
             TeleportService:Teleport(PLACE_ID, Players.LocalPlayer)
         end
     end
 })
-
 
 Ect:AddToggle({
     Name = "Noclip",
